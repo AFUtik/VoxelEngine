@@ -4,9 +4,9 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # Custom
-/build
-/lib
-/include
+build/
+lib/
+include/
 
 # User-specific files
 *.rsuser
