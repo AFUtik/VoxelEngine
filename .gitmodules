@@ -1,0 +1,8 @@
+[submodule "glfw"]
+	lib_path = lib/glfw3.lib
+	include_path = iclude/glfw
+	url = https://github.com/glfw/glfw
+[submodule "glew"]
+	lib_path = lib/glew32s.lib
+	include_path = iclude/glew
+	url = https://github.com/nigels-com/glew
