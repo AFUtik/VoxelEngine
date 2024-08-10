@@ -1,3 +1,0 @@
-E:/Cpp/VoxelEngine/build/CMakeFiles/VoxelEngine.dir
-E:/Cpp/VoxelEngine/build/CMakeFiles/ALL_BUILD.dir
-E:/Cpp/VoxelEngine/build/CMakeFiles/ZERO_CHECK.dir
