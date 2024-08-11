@@ -5,8 +5,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>	
 
-#include "window/Window.hpp"
-#include "window/Events.hpp"
+#include "Window.hpp"
+#include "Events.hpp"
 
 int WIDTH = 1280;
 int HEIGHT = 720;
