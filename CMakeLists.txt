@@ -9,7 +9,7 @@ file(GLOB LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.lib)
 
 project (${PROJECT_NAME})
 
-include_directories(include)
+include_directories(include include/imgui)
 add_executable (${PROJECT_NAME} ${SOURCES})
 
 target_include_directories (${PROJECT_NAME} PRIVATE lib/include)

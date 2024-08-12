@@ -9,6 +9,10 @@
 #include "Window.hpp"
 #include "Events.hpp"
 
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
+
 int WIDTH = 1280;
 int HEIGHT = 720;
 
@@ -48,6 +52,13 @@ int main()
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::StyleColorsDark();
+	ImGui_ImplGlfw_InitForOpenGL(Window::window, true);
+	ImGui_ImplOpenGL3_Init("#version 330");
+
 	while (!Window::isShouldClose()) {
 		Events::pullEvents();
 		if (Events::jpressed(GLFW_KEY_ESCAPE)) {
@@ -59,13 +70,28 @@ int main()
 
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+		
 		shader->use();
 		glBindVertexArray(VAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glBindVertexArray(0);
 
+		ImGui::Begin("Simple Window");
+		ImGui::Text("Just text");
+		ImGui::End();
+
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
 		Window::swapBuffers();
 	}
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
 	delete shader;
 
 	glDeleteBuffers(1, &VBO);
