@@ -14,6 +14,12 @@ int HEIGHT = 720;
 
 // The Original Code from https ://github.com/MihailRis/VoxelEngine-Cpp
 
+float vertices[] = {
+	0.0f, 0.0f, 0.0f,
+	1.0f, 0.0f, 0.0f,
+	0.0f, 1.0f, 0.0f,
+};
+
 int main()
 {
 	Window::init(WIDTH, HEIGHT, "Test Window");
@@ -25,6 +31,20 @@ int main()
 		Window::terminate();
 		return 1;
 	}
+
+	//Create VAO, VBO
+	GLuint VAO, VBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)(0 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 
@@ -39,8 +59,18 @@ int main()
 
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		shader->use();
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glBindVertexArray(0);
+
 		Window::swapBuffers();
 	}
+	delete shader;
+
+	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &VAO);
+
 	Window::terminate();
 	return 0;
 }
