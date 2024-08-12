@@ -15,6 +15,10 @@ bool Events::_cursor_started = false;
 
 #define _MOUSE_BUTTONS 1024
 
+
+// Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/window/Events.cpp
+
+
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos){
 	if (Events::_cursor_started){
 		Events::deltaX += xpos-Events::x;

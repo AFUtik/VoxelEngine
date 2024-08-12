@@ -5,16 +5,26 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>	
 
+#include "Shader.hpp"
 #include "Window.hpp"
 #include "Events.hpp"
 
 int WIDTH = 1280;
 int HEIGHT = 720;
 
+// The Original Code from https ://github.com/MihailRis/VoxelEngine-Cpp
+
 int main()
 {
 	Window::init(WIDTH, HEIGHT, "Test Window");
 	Events::init();
+
+	Shader* shader = load_shader("res/core.vert", "res/core.frag");
+	if (shader == nullptr) {
+		std::cerr << "failed to load shader" << std::endl;
+		Window::terminate();
+		return 1;
+	}
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 

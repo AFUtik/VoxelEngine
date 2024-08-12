@@ -7,6 +7,10 @@
 
 #include "Window.hpp"
 
+
+// Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/window/Window.cpp
+
+
 GLFWwindow* Window::window = nullptr;
 
 int Window::init(int width, int height, const char* title) {

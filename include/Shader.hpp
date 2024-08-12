@@ -1,6 +1,8 @@
 #ifndef SHADER_HPP
 #define SHADER_HPP
 
+#include <string>
+
 class Shader {
 public:
 	unsigned int id;
@@ -10,6 +12,6 @@ public:
 	void use();
 };
 
-extern Shader* load_shader();
+extern Shader* load_shader(std::string vertexFile, std::string fragmentFile);
 
 #endif

@@ -12,6 +12,8 @@
 // Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/graphics/core/Shader.cpp
 
 
+const static std::string ABSOLUTE_PATH = "E:/Cpp/VoxelEngine/";
+
 Shader::Shader(unsigned int id) : id(id) {
 }
 
@@ -33,8 +35,8 @@ Shader* load_shader(std::string vertexFile, std::string fragmentFile) {
     vShaderFile.exceptions(std::ifstream::badbit);
     fShaderFile.exceptions(std::ifstream::badbit);
     try {
-        vShaderFile.open(vertexFile);
-        fShaderFile.open(fragmentFile);
+        vShaderFile.open(ABSOLUTE_PATH + vertexFile);
+        fShaderFile.open(ABSOLUTE_PATH + fragmentFile);
         std::stringstream vShaderStream, fShaderStream;
 
         vShaderStream << vShaderFile.rdbuf();
@@ -51,14 +53,13 @@ Shader* load_shader(std::string vertexFile, std::string fragmentFile) {
         return nullptr;
     }
     const GLchar* vShaderCode = vertexCode.c_str();
-    const GLchar* fShaderCode = vertexCode.c_str();
+    const GLchar* fShaderCode = fragmentCode.c_str();
 
-    GLuint vertex, fragment;
     GLint success;
     GLchar infoLog[512];
 
     //Vertex Shader
-    vertex = glCreateShader(GL_VERTEX_SHADER);
+    GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, nullptr);
     glCompileShader(vertex);
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
@@ -70,7 +71,7 @@ Shader* load_shader(std::string vertexFile, std::string fragmentFile) {
     }
 
     //Fragment Shader
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fShaderCode, nullptr);
     glCompileShader(fragment);
     glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
