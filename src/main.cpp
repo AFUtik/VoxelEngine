@@ -16,7 +16,7 @@
 int WIDTH = 1280;
 int HEIGHT = 720;
 
-// The Original Code from https ://github.com/MihailRis/VoxelEngine-Cpp
+//Original Code from https://github.com/MihailRis/VoxelEngine-Cpp
 
 float vertices[] = {
 	0.0f, 0.0f, 0.0f,
@@ -64,9 +64,6 @@ int main()
 		if (Events::jpressed(GLFW_KEY_ESCAPE)) {
 			Window::setShouldClose(true);
 		}
-		if (Events::jclicked(GLFW_MOUSE_BUTTON_1)) {
-			glClearColor(0.8f, 0.4f, 0.2f, 1);
-		}
 
 		glClear(GL_COLOR_BUFFER_BIT);
 
@@ -79,9 +76,7 @@ int main()
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glBindVertexArray(0);
 
-		ImGui::Begin("Simple Window");
-		ImGui::Text("Just text");
-		ImGui::End();
+		ImGui::ShowDemoWindow();
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
