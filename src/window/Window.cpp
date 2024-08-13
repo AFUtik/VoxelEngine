@@ -1,7 +1,5 @@
 #include <iostream>
 
-#define GLEW_STATIC
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -11,7 +9,7 @@
 // Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/window/Window.cpp
 
 
-GLFWwindow* Window::window = nullptr;
+GLFWwindow* Window::window;
 
 int Window::init(int width, int height, const char* title) {
 	glfwInit();
@@ -27,7 +25,6 @@ int Window::init(int width, int height, const char* title) {
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
-
 	glewExperimental = GL_TRUE;
 	if (glewInit() != GLEW_OK) {
 		std::cout << "Failed to initialize GLEW" << std::endl;

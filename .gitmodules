@@ -1,6 +1,0 @@
-[submodule "glfw"]
-	path = lib/glfw3.lib
-	url = https://github.com/glfw/glfw
-[submodule "glew"]
-	path = lib/glew32s.lib
-	url = https://github.com/nigels-com/glew
