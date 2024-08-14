@@ -11,6 +11,8 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
+#include "Texture_loader.hpp"
+
 int WIDTH = 1280;
 int HEIGHT = 720;
 
@@ -33,6 +35,8 @@ int main()
 		Window::terminate();
 		return 1;
 	}
+
+	Texture* texture = load_texture("res/images/new.png");
 
 	//Create VAO, VBO
 	GLuint VAO, VBO;

@@ -1,6 +1,7 @@
 #version 330 core
 
 layout(location = 0) in vec3 v_pos;
+layout(location = 1) in vec2 a_texCoord;
 
 out vec4 a_color;
 
