@@ -10,13 +10,15 @@
 
 
 GLFWwindow* Window::window;
+int Window::width = 0;
+int Window::height = 0;
 
 int Window::init(int width, int height, const char* title) {
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
 	window = glfwCreateWindow(width, height, "simple window", nullptr, nullptr);
 	if (window == nullptr) {
@@ -32,7 +34,13 @@ int Window::init(int width, int height, const char* title) {
 	}
 
 	glViewport(0, 0, width, height);
+	Window::width = width;
+	Window::height = height;
 	return 0;
+}
+
+void Window::setCursorMode(int mode) {
+	glfwSetInputMode(window, GLFW_CURSOR, mode);
 }
 
 void Window::terminate() {

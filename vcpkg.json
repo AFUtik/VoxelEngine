@@ -3,6 +3,7 @@
   "version-string": "1.0.0",
   "dependencies": [
     "opengl",
+    "glm",
     "glfw3",
     "glew",
     "libpng",

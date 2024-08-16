@@ -18,7 +18,6 @@ bool Events::_cursor_started = false;
 
 // Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/window/Events.cpp
 
-
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos){
 	if (Events::_cursor_started){
 		Events::deltaX += xpos-Events::x;
@@ -88,6 +87,12 @@ bool Events::jclicked(int button){
 	int index = _MOUSE_BUTTONS+button;
 	return _keys[index] && _frames[index] == _current;
 }
+
+void Events::toggle_cursor() {
+	_cursor_locked = !_cursor_locked;
+	Window::setCursorMode(_cursor_locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+}
+
 
 void Events::pullEvents(){
 	_current++;

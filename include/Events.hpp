@@ -25,6 +25,8 @@ public:
 
 	static bool clicked(int button);
 	static bool jclicked(int button);
+
+	static void toggle_cursor();
 };
 
 #endif /* WINDOW_EVENTS_H_ */

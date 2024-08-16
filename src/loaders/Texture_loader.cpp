@@ -17,11 +17,11 @@ int _png_load(const char* file, int* width, int* height) {
     GLuint texture;
     int alpha;
 
-    if (!(f = fopen(file, "r"))) {
+    if (!(f = fopen(file, "rb"))) {
         return 0;
     }
     fread(header, 1, 8, f);
-    is_png = !png_sig_cmp(header, 0, 8);
+    is_png = ~png_sig_cmp(header, 0, 8);
     if (!is_png) {
         fclose(f);
         return 0;
