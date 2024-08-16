@@ -91,7 +91,6 @@ int main()
 	float speed = 5;
 
 	Events::toggle_cursor();
-
 	while (!Window::isShouldClose()) {
 		float currentTime = glfwGetTime();
 		delta = currentTime - lastTime;
@@ -106,16 +105,22 @@ int main()
 		}
 
 		if (Events::pressed(GLFW_KEY_W)) {
-			camera->position += camera->front * delta * speed;
+			camera->position += camera->z_dir * delta * speed;
 		}
-		else if (Events::pressed(GLFW_KEY_S)) {
-			camera->position -= camera->front * delta * speed;
+		if (Events::pressed(GLFW_KEY_S)) {
+			camera->position -= camera->z_dir * delta * speed;
 		}
-		else if (Events::pressed(GLFW_KEY_D)) {
-			camera->position += camera->right * delta * speed;
+		if (Events::pressed(GLFW_KEY_D)) {
+			camera->position += camera->x_dir * delta * speed;
 		}
-		else if (Events::pressed(GLFW_KEY_A)) {
-			camera->position -= camera->right * delta * speed;
+		if (Events::pressed(GLFW_KEY_A)) {
+			camera->position -= camera->x_dir * delta * speed;
+		}
+		if (Events::pressed(GLFW_KEY_SPACE)) {
+			camera->position += camera->y_dir * delta * speed;
+		}
+		if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
+			camera->position -= camera->y_dir * delta * speed;
 		}
 
 		if (Events::_cursor_locked) {

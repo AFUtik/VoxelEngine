@@ -7,9 +7,9 @@ using namespace glm;
 class Camera {
 	void updateVectors();
 public:
-	vec3 front;
-	vec3 up;
-	vec3 right;
+	vec3 x_dir;
+	vec3 y_dir;
+	vec3 z_dir;
 
 	vec3 position;
 	float fov;

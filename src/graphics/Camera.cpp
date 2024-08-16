@@ -9,9 +9,10 @@ Camera::Camera(vec3 position, float fov) : position(position), fov(fov), rotatio
 }
 
 void Camera::updateVectors() {
-	front = vec3(rotation * vec4(0, 0, -1, 1));
-	right = vec3(rotation * vec4(1, 0, 0, 1));
-	up = vec3(rotation * vec4(0, 1, 0, 1));
+	x_dir = vec3(rotation * vec4(1, 0, 0, 1));
+	y_dir = vec3(rotation * vec4(0, 1, 0, 1));
+	z_dir = vec3(rotation * vec4(0, 0, -1, 1));
+	
 }
 
 void Camera::rotate(float x, float y, float z) {
@@ -28,5 +29,5 @@ mat4 Camera::getProjection() {
 }
 
 mat4 Camera::getView() {
-	return glm::lookAt(position, position + front, up);
+	return glm::lookAt(position, position + z_dir, y_dir);
 }
