@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>	
 
 #include "Camera.hpp"
+#include "Mesh.hpp"
 
 #include "Shader.hpp"
 #include "Window.hpp"
@@ -34,6 +35,10 @@ float vertices[] = {
 	  -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
 };
 
+int attrs[]{
+	3, 2, 0 //null terminator
+};
+
 int main()
 {
 	Window::init(WIDTH, HEIGHT, "Test Window");
@@ -54,21 +59,7 @@ int main()
 		return 1;
 	}
 
-	//Create VAO, VBO
-	GLuint VAO, VBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	// position
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(0 * sizeof(GLfloat)));
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
+	Mesh* mesh = new Mesh(vertices, 6, attrs);
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 
@@ -96,7 +87,6 @@ int main()
 		delta = currentTime - lastTime;
 		lastTime = currentTime;
 
-		Events::pullEvents();
 		if (Events::jpressed(GLFW_KEY_ESCAPE)) {
 			Window::setShouldClose(true);
 		}
@@ -151,9 +141,8 @@ int main()
 		shader->uniformMatrix("model", model);
 		shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
 		texture->bind();
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		glBindVertexArray(0);
+
+		mesh->draw(GL_TRIANGLES);
 
 		//ImGui::ShowDemoWindow();
 
@@ -161,16 +150,15 @@ int main()
 		//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		Window::swapBuffers();
+		Events::pullEvents();
 	}
 	//ImGui_ImplOpenGL3_Shutdown();
 	//ImGui_ImplGlfw_Shutdown();
 	//ImGui::DestroyContext();
-
 	delete texture;
 	delete shader;
 
-	glDeleteBuffers(1, &VBO);
-	glDeleteVertexArrays(1, &VAO);
+	delete mesh;
 
 	Window::terminate();
 	return 0;
