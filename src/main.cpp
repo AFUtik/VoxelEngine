@@ -105,22 +105,25 @@ int main()
 		}
 
 		if (Events::pressed(GLFW_KEY_W)) {
-			camera->position += camera->z_dir * delta * speed;
+			camera->translate_z(delta * speed);
 		}
 		if (Events::pressed(GLFW_KEY_S)) {
-			camera->position -= camera->z_dir * delta * speed;
+			camera->translate_z(-delta * speed);
 		}
 		if (Events::pressed(GLFW_KEY_D)) {
-			camera->position += camera->x_dir * delta * speed;
+			camera->translate_x(delta * speed);
 		}
 		if (Events::pressed(GLFW_KEY_A)) {
-			camera->position -= camera->x_dir * delta * speed;
+			camera->translate_x(-delta * speed);
 		}
 		if (Events::pressed(GLFW_KEY_SPACE)) {
-			camera->position += camera->y_dir * delta * speed;
+			camera->translate_y(delta * speed);
 		}
 		if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
-			camera->position -= camera->y_dir * delta * speed;
+			camera->translate_y(-delta * speed);
+		}
+		if (Events::pressed(GLFW_KEY_0)) {
+			camera->set_xyz(0, 0, 1);
 		}
 
 		if (Events::_cursor_locked) {

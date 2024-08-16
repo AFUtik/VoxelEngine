@@ -8,6 +8,22 @@ Camera::Camera(vec3 position, float fov) : position(position), fov(fov), rotatio
 	updateVectors();
 }
 
+void Camera::set_xyz(float x, float y, float z) {
+	position = glm::vec3(x, y, z);
+}
+
+void Camera::translate_x(float distance) {
+	position += x_dir * distance;
+}
+
+void Camera::translate_y(float distance) {
+	position += y_dir * distance;
+}
+
+void Camera::translate_z(float distance) {
+	position += z_dir * distance;
+}
+
 void Camera::updateVectors() {
 	x_dir = vec3(rotation * vec4(1, 0, 0, 1));
 	y_dir = vec3(rotation * vec4(0, 1, 0, 1));
