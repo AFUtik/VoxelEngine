@@ -3,10 +3,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>	
 
-#include "Camera.hpp"
-#include "Mesh.hpp"
+#include "graphics/Camera.hpp"
+#include "graphics/Mesh.hpp"
+#include "graphics/Texture.hpp"
+#include "graphics/Shader.hpp"
+#include "graphics/BlockRenderer.hpp"
 
-#include "Shader.hpp"
+#include "blocks/Chunk.hpp"
+
 #include "Window.hpp"
 #include "Events.hpp"
 
@@ -14,7 +18,6 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-#include "Texture.hpp"
 #include "Texture_loader.hpp"
 
 #include "glm/glm.hpp"
@@ -51,7 +54,7 @@ int main()
 		return 1;
 	}
 
-	Texture* texture = load_texture("E:/Cpp/VoxelEngine/res/images/new.png");
+	Texture* texture = load_texture("E:/Cpp/VoxelEngine/res/images/block.png");
 	if (texture == nullptr) {
 		std::cerr << "failed to load texture" << std::endl;
 		delete texture;
@@ -59,9 +62,16 @@ int main()
 		return 1;
 	}
 
-	Mesh* mesh = new Mesh(vertices, 6, attrs);
+	BlockRenderer renderer(1024*1024);
+	Chunk* chunk = new Chunk();
+	Mesh* mesh = renderer.render(chunk);
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	//IMGUI_CHECKVERSION();
 	//ImGui::CreateContext();
@@ -79,7 +89,7 @@ int main()
 	float camX = 0.0f;
 	float camY = 0.0f;
 
-	float speed = 5;
+	float speed = 25;
 
 	Events::toggle_cursor();
 	while (!Window::isShouldClose()) {
@@ -95,22 +105,26 @@ int main()
 		}
 
 		if (Events::pressed(GLFW_KEY_W)) {
-			camera->translate_z(delta * speed);
+			camera->position += camera->z_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_S)) {
-			camera->translate_z(-delta * speed);
+			camera->position -= camera->z_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_D)) {
-			camera->translate_x(delta * speed);
+			camera->position += camera->x_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_A)) {
-			camera->translate_x(-delta * speed);
+			camera->position -= camera->x_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_SPACE)) {
-			camera->translate_y(delta * speed);
+			camera->y_dir = glm::vec3(0, 1, 0);
+
+			camera->position += camera->y_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
-			camera->translate_y(-delta * speed);
+			camera->y_dir = glm::vec3(0, 1, 0);
+
+			camera->position -= camera->y_dir * delta * speed;
 		}
 		if (Events::pressed(GLFW_KEY_0)) {
 			camera->set_xyz(0, 0, 1);
@@ -131,7 +145,7 @@ int main()
 			camera->rotate(camY, camX, 0);
 		}
 
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//ImGui_ImplOpenGL3_NewFrame();
 		//ImGui_ImplGlfw_NewFrame();
@@ -158,6 +172,7 @@ int main()
 	delete texture;
 	delete shader;
 
+	delete chunk;
 	delete mesh;
 
 	Window::terminate();

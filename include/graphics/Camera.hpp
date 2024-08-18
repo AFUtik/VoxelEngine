@@ -16,10 +16,6 @@ public:
 	mat4 rotation;
 	Camera(vec3 position, float fov);
 
-	void translate_x(float distance);
-	void translate_y(float distance);
-	void translate_z(float distance);
-
 	void set_xyz(float x, float y, float z);
 
 	void rotate(float x, float y, float z);

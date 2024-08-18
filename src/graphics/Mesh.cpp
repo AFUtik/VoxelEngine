@@ -1,4 +1,4 @@
-#include "Mesh.hpp"
+#include "graphics/Mesh.hpp"
 #include <GL/glew.h>
 
 Mesh::Mesh(const float* buffer, size_t vertices, const int* attrs) : vertices(vertices) {

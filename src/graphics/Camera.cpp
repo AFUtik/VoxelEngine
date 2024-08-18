@@ -1,4 +1,4 @@
-#include "Camera.hpp"
+#include "graphics/Camera.hpp"
 #include "Window.hpp"
 
 #include <glm/ext.hpp>
@@ -10,18 +10,6 @@ Camera::Camera(vec3 position, float fov) : position(position), fov(fov), rotatio
 
 void Camera::set_xyz(float x, float y, float z) {
 	position = glm::vec3(x, y, z);
-}
-
-void Camera::translate_x(float distance) {
-	position += x_dir * distance;
-}
-
-void Camera::translate_y(float distance) {
-	position += y_dir * distance;
-}
-
-void Camera::translate_z(float distance) {
-	position += z_dir * distance;
 }
 
 void Camera::updateVectors() {
@@ -41,7 +29,7 @@ void Camera::rotate(float x, float y, float z) {
 
 mat4 Camera::getProjection() {
 	float aspect = (float)Window::width / (float)Window::height;
-	return glm::perspective(fov, aspect, 0.1f, 100.0f);
+	return glm::perspective(fov, aspect, 0.1f, 500.0f);
 }
 
 mat4 Camera::getView() {
