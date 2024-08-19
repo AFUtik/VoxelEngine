@@ -1,12 +1,10 @@
 #include <iostream>
-#include <algorithm>
-#include <numeric>
 #include <random>
-#include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <noise/perlin_noise.hpp>
 
-#include "noise/perlin_noise3d.hpp"
-
-PerlinGenerator3D::PerlinGenerator3D(const unsigned long seed) : default_seed(seed) {
+PerlinNoise::PerlinNoise(const unsigned long seed) : default_seed(seed) {
     p.resize(256);
     std::iota(p.begin(), p.end(), uint8_t{ 0 });
     std::mt19937 gen(seed);
@@ -29,8 +27,32 @@ inline constexpr double grad(int hash, double x, double y, double z) noexcept {
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 }
 
+inline constexpr double dot(const int* v, double x, double y) noexcept {
+    return v[0] * x + v[1] * y;
+}
 
-float PerlinGenerator3D::noise(double x, double y, double z) {
+
+
+float PerlinNoise::noise2d(double x, double y) {
+    int X = static_cast<int>(floor(x)) & 255;
+    int Y = static_cast<int>(floor(y)) & 255;
+
+    x -= floor(x);
+    y -= floor(y);
+
+    double u = fade(x);
+    double v = fade(y);
+
+    int aa = p[p[X] + Y];
+    int ab = p[p[X] + Y + 1];
+    int ba = p[p[X + 1] + Y];
+    int bb = p[p[X + 1] + Y + 1];
+
+    return lerp(lerp(grad(aa, x, y, 0), grad(ba, x - 1, y, 0), u), 
+                lerp(grad(ab, x, y - 1, 0), grad(bb, x - 1, y - 1, 0), u), v);
+}
+
+float PerlinNoise::noise3d(double x, double y, double z) {
     const int xInd = static_cast<int>(std::floor(x)) & 255;
     const int yInd = static_cast<int>(std::floor(y)) & 255;
     const int zInd = static_cast<int>(std::floor(z)) & 255;
@@ -53,7 +75,7 @@ float PerlinGenerator3D::noise(double x, double y, double z) {
     return lerp(
         lerp(
             lerp(grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z), u),
-            lerp(grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z), u) , v
+            lerp(grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z), u), v
         ),
         lerp(
             lerp(grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1), u),
