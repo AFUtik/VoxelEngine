@@ -4,12 +4,12 @@
 #include <iostream>
 #include <chrono>
 
-#include "noise/perlin_noise.hpp"
+#include "noise/PerlinNoise.hpp"
+#include "noise/SimplexNoise.h"
 
 #include <cmath>
 
 Chunk::Chunk() {
-	PerlinNoise p(0);
 	const float scale = 0.05f;
 	auto start = std::chrono::high_resolution_clock::now();
 	blocks = new block[CHUNK_VOL];
@@ -17,7 +17,7 @@ Chunk::Chunk() {
 		for (int z = 0; z < CHUNK_D; z++) {
 			for (int x = 0; x < CHUNK_W; x++) {
 				int id = 0;
-				float value = p.noise2d(x * scale, y * scale);
+				float value = PerlinNoise::noise(x*scale, y*scale, z*scale);
 				if (0.5f <= value) {
 					id = 2;
 				}

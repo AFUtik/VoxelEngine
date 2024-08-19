@@ -2,9 +2,15 @@
 #include <random>
 #include <numeric>
 #include <algorithm>
-#include <noise/perlin_noise.hpp>
+#include <vector>
+#include <noise/PerlinNoise.hpp>
 
-PerlinNoise::PerlinNoise(const unsigned long seed) : default_seed(seed) {
+std::vector<std::uint8_t> PerlinNoise::p;
+unsigned long PerlinNoise::default_seed = 0;
+
+void PerlinNoise::seed(unsigned long seed) {
+    default_seed = seed;
+    
     p.resize(256);
     std::iota(p.begin(), p.end(), uint8_t{ 0 });
     std::mt19937 gen(seed);
@@ -31,9 +37,9 @@ inline constexpr double dot(const int* v, double x, double y) noexcept {
     return v[0] * x + v[1] * y;
 }
 
+float PerlinNoise::noise(double x, double y) {
+    std::cout << p.size() << std::endl;
 
-
-float PerlinNoise::noise2d(double x, double y) {
     int X = static_cast<int>(floor(x)) & 255;
     int Y = static_cast<int>(floor(y)) & 255;
 
@@ -52,7 +58,7 @@ float PerlinNoise::noise2d(double x, double y) {
                 lerp(grad(ab, x, y - 1, 0), grad(bb, x - 1, y - 1, 0), u), v);
 }
 
-float PerlinNoise::noise3d(double x, double y, double z) {
+float PerlinNoise::noise(double x, double y, double z) {
     const int xInd = static_cast<int>(std::floor(x)) & 255;
     const int yInd = static_cast<int>(std::floor(y)) & 255;
     const int zInd = static_cast<int>(std::floor(z)) & 255;

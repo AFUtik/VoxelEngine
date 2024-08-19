@@ -20,6 +20,8 @@
 
 #include "Texture_loader.hpp"
 
+#include "noise/PerlinNoise.hpp"
+
 #include "glm/glm.hpp"
 #include "glm/ext.hpp"
 
@@ -49,6 +51,9 @@ int main()
 	}
 
 	BlockRenderer renderer(1024 * 1024);
+
+	PerlinNoise::seed(1);
+
 	Chunk* chunk = new Chunk();
 	Mesh* mesh = renderer.render(chunk);
 
