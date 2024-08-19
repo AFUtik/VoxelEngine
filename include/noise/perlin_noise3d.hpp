@@ -1,27 +1,18 @@
 #ifndef PERLIN_NOISE3D_HPP
 #define PERLIN_NOISE3D_HPP
 
-typedef unsigned int uint;
-
-#include <random>
+#include <vector>
 
 class PerlinGenerator3D {
 private:
-	static float V[26][3];
-	const long default_seed;
-	const uint M, N, B, w, h, l;
-	uint ***R;
+	std::vector<std::uint8_t> p;
 public:
-	PerlinGenerator3D(uint M, uint N, uint B, 
-					  uint w, uint h, uint l, 
-					  uint x_max, uint y_max, uint z_max,
-					  const long seed);
+	const unsigned long default_seed;
+
+	PerlinGenerator3D(const unsigned long seed);
 	~PerlinGenerator3D();
 
-	float noise(float x, float y, float z);
-	float*** genDataset();
+	float noise(double x, double y, double z);
 };
-
-extern void free_dataset(float*** dataset, int width, int height);
 
 #endif // !PERLIN_NOISE_HPP
