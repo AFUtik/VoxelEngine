@@ -3,7 +3,7 @@
 #include "graphics/Mesh.hpp"
 #include "graphics/BlockRenderer.hpp"
 
-#define VERTEX_SIZE (3 + 2)
+#define VERTEX_SIZE (3 + 2 + 1)
 
 #define IS_IN(X,Y,Z) ((X) >= 0 && (X) < CHUNK_W && (Y) >= 0 && (Y) < CHUNK_H && (Z) >= 0 && (Z) < CHUNK_D)
 #define VOXEL(X,Y,Z) (chunk->blocks[((Y) * CHUNK_D + (Z)) * CHUNK_W + (X)])
@@ -17,7 +17,7 @@
 								  buffer[INDEX+5] = (L);\
 								  INDEX += VERTEX_SIZE;
 
-int chunk_attrs[] = { 3,2, 0 };
+int chunk_attrs[] = { 3,2, 1, 0 };
 
 BlockRenderer::BlockRenderer(size_t capacity) : capacity(capacity) {
 	buffer = new float[capacity * VERTEX_SIZE * 6];

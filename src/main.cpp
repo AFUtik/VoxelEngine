@@ -28,20 +28,6 @@ int HEIGHT = 1080;
 
 //Original Code from https://github.com/MihailRis/VoxelEngine-Cpp
 
-float vertices[] = {
-	-1.0f,-1.0f, 0.0f, 0.0f, 0.0f,
-	1.0f,-1.0f, 0.0f, 1.0f, 0.0f,
-	-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-
-	1.0f,-1.0f, 0.0f, 1.0f, 0.0f,
-	1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-	  -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-};
-
-int attrs[]{
-	3, 2, 0 //null terminator
-};
-
 int main()
 {
 	Window::init(WIDTH, HEIGHT, "Test Window");
@@ -62,7 +48,7 @@ int main()
 		return 1;
 	}
 
-	BlockRenderer renderer(1024*1024);
+	BlockRenderer renderer(1024 * 1024);
 	Chunk* chunk = new Chunk();
 	Mesh* mesh = renderer.render(chunk);
 

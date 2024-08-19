@@ -4,15 +4,24 @@
 
 #include "noise/perlin_noise3d.hpp"
 
-float PerlinGenerator3D::V[12][3] = {
-        {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 1.0f},  {-1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f, 0.0f},
+float PerlinGenerator3D::V[26][3] = {
+        {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f},  {-1.0f, 1.0f, 0.0f}, {-1.0f, -1.0f, 0.0f},
         {1.0f, 0.0f, 1.0f}, {-1.0f, 0.0f, 1.0f},  {1.0f, 0.0f, -1.0f}, {-1.0f, 1.0f, -1.0f},
-        {0.0f, 1.0f, 1.0f}, {0.0f, -1.0f, 1.0f},  {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f}
+        {0.0f, 1.0f, 1.0f}, {0.0f, -1.0f, 1.0f},  {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f},
+        {1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f},  {1.0f, 1.0f, -1.0f}, {-1.0f, 1.0f, -1.0f},
+        {-1.0f,-1.0f,-1.0f},{-1.0f, -1.0f, 1.0f}, {1.0f, -1.0f, -1.0f},{1.0f, -1.0f, 1.0f},
+        {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},  {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}
 };
 
 PerlinGenerator3D::PerlinGenerator3D(uint M, uint N, uint B, 
                                      uint w, uint h, uint l, 
+                                     uint x_max, uint y_max, uint z_max,
                                      const long seed) : M(M), N(N), B(B), w(w), h(h), l(l), default_seed(seed) {
+    if (x_max > M * w || y_max > N * h || z_max > B * l) {
+        std::cerr << "Error with PerlinNoise3D -> Exception: Invalid size 'max_coords > specified_coords'" << std::endl;
+    }
+
     R = new uint**[M];
     for (int i = 0; i < M; ++i) {
         R[i] = new uint*[N];
@@ -21,7 +30,7 @@ PerlinGenerator3D::PerlinGenerator3D(uint M, uint N, uint B,
         }
     }
     std::mt19937 gen(seed);
-    std::uniform_int_distribution<> dis(0, 11);
+    std::uniform_int_distribution<> dis(0, 26);
 
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
@@ -40,11 +49,18 @@ inline float lerp(float a, float b, float t) {
     return a + (b - a) * t;
 }
 
+float grad(int hash, float x, float y, float z) {
+    int h = hash & 15; // Берём последние 4 бита от hash
+    float u = (h < 8) ? x : y; // Если h < 8, u = x, иначе u = y
+    float v = (h < 4) ? y : ((h == 12 || h == 14) ? z : x); // Если h < 4, v = y; если h = 12 или 14, v = z; иначе v = x
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v); // Возвращаем u или -u, и добавляем v или -v
+}
+
 inline float dot(const float* a, const float* b) {
     return a[0] * b[0] + a[1] * b[1] + a[2] + b[2];
 }
 
-float PerlinGenerator3D::noise(int x, int y, int z) {
+float PerlinGenerator3D::noise(float x, float y, float z) {
     int xInd = x / w;
     int yInd = y / h;
     int zInd = z / l;
