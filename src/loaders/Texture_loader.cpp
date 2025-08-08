@@ -1,10 +1,9 @@
-#include "Texture_loader.hpp"
+#include "../window/Texture_loader.hpp"
 
 #include <iostream>
 #include "GL/glew.h"
 #include "png.h"
-#include "graphics/Texture.hpp"
-
+#include "../graphics/model/Texture.hpp"
 
 int _png_load(const char* file, int* width, int* height) {
     FILE* f;

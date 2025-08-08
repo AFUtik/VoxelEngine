@@ -1,8 +1,7 @@
-#include "graphics/Camera.hpp"
-#include "Window.hpp"
+#include "Camera.hpp"
+#include "../window/Window.hpp"
 
 #include <glm/ext.hpp>
-
 
 Camera::Camera(vec3 position, float fov) : position(position), fov(fov), rotation(1.0f) {
 	updateVectors();

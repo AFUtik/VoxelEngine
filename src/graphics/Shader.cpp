@@ -1,4 +1,4 @@
-#include "graphics/Shader.hpp"
+#include "Shader.hpp"
 
 #include <exception>
 #include <fstream>
@@ -10,9 +10,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-
 // Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/graphics/core/Shader.cpp
-
 
 const static std::string ABSOLUTE_PATH = "E:/Cpp/VoxelEngine/";
 

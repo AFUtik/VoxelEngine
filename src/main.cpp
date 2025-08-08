@@ -4,21 +4,22 @@
 #include <GLFW/glfw3.h>	
 
 #include "graphics/Camera.hpp"
-#include "graphics/Mesh.hpp"
-#include "graphics/Texture.hpp"
+#include "graphics/model/Mesh.hpp"
+#include "graphics/model/Texture.hpp"
 #include "graphics/Shader.hpp"
-#include "graphics/BlockRenderer.hpp"
+#include "graphics/renderer/BlockRenderer.hpp"
 
+#include "blocks/Block.hpp"
 #include "blocks/Chunk.hpp"
+#include "blocks/Chunks.hpp"
 
-#include "Window.hpp"
-#include "Events.hpp"
+#include "lighting/LightMap.hpp"
+#include "lighting/LightSolver.hpp"
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_opengl3.h"
+#include "window/Window.hpp"
+#include "window/Events.hpp"
 
-#include "Texture_loader.hpp"
+#include "window/Texture_loader.hpp"
 
 #include "noise/PerlinNoise.hpp"
 
@@ -50,12 +51,13 @@ int main()
 		return 1;
 	}
 
-	BlockRenderer renderer(1024 * 1024);
 
-	PerlinNoise::seed(1);
+	Chunks* chunks = new Chunks(6, 1, 4);
+	BlockRenderer renderer(chunks);
 
-	Chunk* chunk = new Chunk();
-	Mesh* mesh = renderer.render(chunk);
+	//Mesh** meshes = new Mesh * [chunks->volume];
+	//for (size_t i = 0; i < chunks->volume; i++)
+	//	meshes[i] = nullptr;
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 
@@ -63,6 +65,68 @@ int main()
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    /*
+	LightSolver* solverR = new LightSolver(chunks, 0);
+	LightSolver* solverG = new LightSolver(chunks, 1);
+	LightSolver* solverB = new LightSolver(chunks, 2);
+	LightSolver* solverS = new LightSolver(chunks, 3);
+
+	for (int y = 0; y < chunks->h * CHUNK_H; y++) {
+		for (int z = 0; z < chunks->d * CHUNK_D; z++) {
+			for (int x = 0; x < chunks->w * CHUNK_W; x++) {
+				block vox = chunks->get(x, y, z);
+				if (vox.id == 1) {
+					solverR->add(x, y, z, 15);
+					solverG->add(x, y, z, 15);
+					solverB->add(x, y, z, 15);
+				}
+			}
+		}
+	}
+
+	for (int z = 0; z < chunks->d * CHUNK_D; z++) {
+		for (int x = 0; x < chunks->w * CHUNK_W; x++) {
+			for (int y = chunks->h * CHUNK_H - 1; y >= 0; y--) {
+				block vox = chunks->get(x, y, z);
+				if (vox.id != 0) {
+					break;
+				}
+				chunks->getChunkByBlock(x, y, z)->lightmap->setS(x % CHUNK_W, y % CHUNK_H, z % CHUNK_D, 0xF);
+			}
+		}
+	}
+
+	for (int z = 0; z < chunks->d * CHUNK_D; z++) {
+		for (int x = 0; x < chunks->w * CHUNK_W; x++) {
+			for (int y = chunks->h * CHUNK_H - 1; y >= 0; y--) {
+				block vox = chunks->get(x, y, z);
+				if (vox.id != 0) {
+					break;
+				}
+				if (
+					chunks->getLight(x - 1, y, z, 3) == 0 ||
+					chunks->getLight(x + 1, y, z, 3) == 0 ||
+					chunks->getLight(x, y - 1, z, 3) == 0 ||
+					chunks->getLight(x, y + 1, z, 3) == 0 ||
+					chunks->getLight(x, y, z - 1, 3) == 0 ||
+					chunks->getLight(x, y, z + 1, 3) == 0
+					) {
+					solverS->add(x, y, z);
+				}
+				chunks->getChunkByBlock(x, y, z)->lightmap->setS(x % CHUNK_W, y % CHUNK_H, z % CHUNK_D, 0xF);
+			}
+		}
+	}
+
+	solverR->solve();
+	solverG->solve();
+	solverB->solve();
+	solverS->solve();
+
+	*/
+
+	for (size_t i = 0; i < chunks->volume; ++i) renderer.render(chunks->chunks[i]);
+
 
 	//IMGUI_CHECKVERSION();
 	//ImGui::CreateContext();
@@ -72,7 +136,6 @@ int main()
 	//ImGui_ImplOpenGL3_Init("#version 330");
 
 	Camera* camera = new Camera(glm::vec3(0, 0, 1), glm::radians(90.0f));
-	glm::mat4 model(1.0f);
 
 	float lastTime = glfwGetTime();
 	float delta = 0.0f;
@@ -143,11 +206,12 @@ int main()
 		//ImGui::NewFrame();
 		
 		shader->use();
-		shader->uniformMatrix("model", model);
 		shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
 		texture->bind();
 
-		mesh->draw(GL_TRIANGLES);
+		for (size_t i = 0; i < chunks->volume; i++) {
+			chunks->chunks[i]->chunk_draw.draw();
+		}
 
 		//ImGui::ShowDemoWindow();
 
@@ -160,11 +224,16 @@ int main()
 	//ImGui_ImplOpenGL3_Shutdown();
 	//ImGui_ImplGlfw_Shutdown();
 	//ImGui::DestroyContext();
+
 	delete texture;
 	delete shader;
 
-	delete chunk;
-	delete mesh;
+	// delete solverR;
+	// delete solverG;
+	// delete solverB;
+	// delete solverS;
+
+	delete chunks;
 
 	Window::terminate();
 	return 0;

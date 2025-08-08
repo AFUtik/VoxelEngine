@@ -1,45 +1,18 @@
 #include <iostream>
-#include <random>
 #include <numeric>
 #include <algorithm>
 #include <vector>
-#include <noise/PerlinNoise.hpp>
 
-std::vector<std::uint8_t> PerlinNoise::p;
-unsigned long PerlinNoise::default_seed = 0;
+#include "PerlinNoise.hpp"
 
-void PerlinNoise::seed(unsigned long seed) {
-    default_seed = seed;
-    
-    p.resize(256);
-    std::iota(p.begin(), p.end(), uint8_t{ 0 });
-    std::mt19937 gen(seed);
-    std::shuffle(p.begin(), p.end(), gen);
-    p.insert(p.end(), p.begin(), p.end());
-}
+PerlinNoise::PerlinNoise(uint64_t seed): seed(seed), gen(seed) {
+    std::iota(p, p+256, uint8_t{ 0 });
+    std::shuffle(p, p+256, gen);
 
-inline constexpr static float fade(float t) noexcept {
-    return t * t * t * ((6 * t - 15) * t + 10);
-}
-
-inline constexpr static double lerp(double a, double b, double t) noexcept {
-    return a + (b - a) * t;
-}
-
-inline constexpr double grad(int hash, double x, double y, double z) noexcept {
-    const std::uint8_t h = hash & 15;
-    const float u = h < 8 ? x : y;
-    const float v = h < 4 ? y : h == 12 || h == 14 ? x : z;
-    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
-}
-
-inline constexpr double dot(const int* v, double x, double y) noexcept {
-    return v[0] * x + v[1] * y;
+    for(size_t i = 255; i < 512; i++) p[i] = p[i-255];
 }
 
 float PerlinNoise::noise(double x, double y) {
-    std::cout << p.size() << std::endl;
-
     int X = static_cast<int>(floor(x)) & 255;
     int Y = static_cast<int>(floor(y)) & 255;
 
@@ -49,13 +22,13 @@ float PerlinNoise::noise(double x, double y) {
     double u = fade(x);
     double v = fade(y);
 
-    int aa = p[p[X] + Y];
-    int ab = p[p[X] + Y + 1];
-    int ba = p[p[X + 1] + Y];
-    int bb = p[p[X + 1] + Y + 1];
+    const uint8_t aa = p[p[X] + Y];
+    const uint8_t ab = p[p[X] + Y + 1];
+    const uint8_t ba = p[p[X + 1] + Y];
+    const uint8_t bb = p[p[X + 1] + Y + 1];
 
-    return lerp(lerp(grad(aa, x, y, 0), grad(ba, x - 1, y, 0), u), 
-                lerp(grad(ab, x, y - 1, 0), grad(bb, x - 1, y - 1, 0), u), v);
+    return lerp(lerp(grad2(aa, x, y), grad2(ba, x - 1, y), u),
+                lerp(grad2(ab, x, y - 1), grad2(bb, x - 1, y - 1), u), v);
 }
 
 float PerlinNoise::noise(double x, double y, double z) {
@@ -80,12 +53,28 @@ float PerlinNoise::noise(double x, double y, double z) {
 
     return lerp(
         lerp(
-            lerp(grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z), u),
-            lerp(grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z), u), v
+            lerp(grad3(p[AA], x, y, z), grad3(p[BA], x - 1, y, z), u),
+            lerp(grad3(p[AB], x, y - 1, z), grad3(p[BB], x - 1, y - 1, z), u), v
         ),
         lerp(
-            lerp(grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1), u),
-            lerp(grad(p[AB + 1], x, y - 1, z - 1), grad(p[BB + 1], x - 1, y - 1, z - 1), u), v
+            lerp(grad3(p[AA + 1], x, y, z - 1), grad3(p[BA + 1], x - 1, y, z - 1), u),
+            lerp(grad3(p[AB + 1], x, y - 1, z - 1), grad3(p[BB + 1], x - 1, y - 1, z - 1), u), v
         ), w
     );
 }
+
+float PerlinNoise::detail(double x, double y, double z) {
+    float total = 0.0;
+    float max_amplitude = 0.0;
+    float amplitude = 1.0;
+    float frequency = base_freq;
+    for (size_t i = 0; i < octaves; i++) {
+        total += amplitude * noise(x*frequency, y*frequency, z*frequency);
+        max_amplitude += amplitude;
+        amplitude *= persistance;
+        frequency *= lacunarity;
+    }
+    return total / max_amplitude;
+}
+
+float detail(double x, double y) {return 0.0f;}
