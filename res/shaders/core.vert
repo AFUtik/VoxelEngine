@@ -12,7 +12,7 @@ uniform mat4 projview;
 
 void main() {
 	a_color = vec4(v_light.r, v_light.g, v_light.b, 1.0f);
-	// a_color.rgb += v_light.a;
+	a_color.rgb += v_light.a;
 	a_texCoord = v_texCoord;
 	gl_Position = projview * model * vec4(v_pos, 1.0f);
 }

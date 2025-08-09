@@ -22,7 +22,7 @@ public:
 	LightSolver(Chunks* chunks, int channel);
 
 	void add(int x, int y, int z);
-	void add(int x, int y, int z, int emission);
+	void add(int x, int y, int z, uint8_t emission);
 	void remove(int x, int y, int z);
 	void solve();
 };

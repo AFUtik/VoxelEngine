@@ -1,18 +1,20 @@
 #ifndef BLOCKRENDERER_HPP
 #define BLOCKRENDERER_HPP
 
+
 class Mesh;
 class Chunk;
 class Chunks;
 
-#include "ChunkDrawBuilder.hpp"
+#include "ChunkMesher.hpp"
 
 class BlockRenderer {
-	Chunks *chunks;
+	ChunkMesher mesher;
+	Chunks *world;
 public:
-	BlockRenderer(Chunks* world) :  chunks(world) {};
+	BlockRenderer(Chunks* world) :  mesher(world), world(world)  {};
 
-	void render(Chunk *chunk);
+	void renderAll();
 };
 
 #endif // !BLOCKRENDERER_HPP

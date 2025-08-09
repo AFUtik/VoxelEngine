@@ -21,7 +21,7 @@ public:
 	Mesh() : buffer(new VertexBuffer) {}
 	~Mesh();
 
-	inline VertexConsumer get_consumer() const {return VertexConsumer(buffer.get());}
+	inline VertexConsumer getConsumer() const {return VertexConsumer(buffer.get());}
 
 	void upload_buffers();
 

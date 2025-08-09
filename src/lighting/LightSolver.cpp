@@ -4,22 +4,20 @@
 #include "../blocks/Chunk.hpp"
 #include "../blocks/Block.hpp"
 
+#include <iostream>
+
 LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
 }
 
-void LightSolver::add(int x, int y, int z, int emission) {
+void LightSolver::add(int x, int y, int z, uint8_t emission) {
 	if (emission <= 1)
 		return;
-	lightentry entry;
-	entry.x = x;
-	entry.y = y;
-	entry.z = z;
-	entry.light = emission;
+	lightentry entry {x, y, z, emission};
 	addqueue.push(entry);
 
-	Chunk* chunk = chunks->getChunkByBlock(entry.x, entry.y, entry.z);
+	Chunk* chunk = chunks->getChunkByBlock(x, y, z);
 	// chunk->modified = true;
-	chunk->lightmap->set(entry.x - chunk->x * CHUNK_W, entry.y - chunk->y * CHUNK_H, entry.z - chunk->z * CHUNK_D, channel, entry.light);
+	chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, entry.light);
 }
 
 void LightSolver::add(int x, int y, int z) {
@@ -31,7 +29,7 @@ void LightSolver::remove(int x, int y, int z) {
 	if (chunk == nullptr)
 		return;
 
-	int light = chunk->lightmap->get(x - chunk->x * CHUNK_W, y - chunk->y * CHUNK_H, z - chunk->z * CHUNK_D, channel);
+	int light = chunk->lightmap->get(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel);
 	if (light == 0) {
 		return;
 	}
@@ -43,7 +41,7 @@ void LightSolver::remove(int x, int y, int z) {
 	entry.light = light;
 	remqueue.push(entry);
 
-	chunk->lightmap->set(entry.x - chunk->x * CHUNK_W, entry.y - chunk->y * CHUNK_H, entry.z - chunk->z * CHUNK_D, channel, 0);
+	chunk->lightmap->set(entry.x - chunk->x * Chunk::WIDTH, entry.y - chunk->y * Chunk::HEIGHT, entry.z - chunk->z * Chunk::DEPTH, channel, 0);
 }
 
 void LightSolver::solve() {
@@ -74,7 +72,7 @@ void LightSolver::solve() {
 					nentry.z = z;
 					nentry.light = light;
 					remqueue.push(nentry);
-					chunk->lightmap->set(x - chunk->x * CHUNK_W, y - chunk->y * CHUNK_H, z - chunk->z * CHUNK_D, channel, 0);
+					chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, 0);
 					// chunk->modified = true;
 				}
 				else if (light >= entry.light) {
@@ -102,10 +100,10 @@ void LightSolver::solve() {
 			int z = entry.z + coords[i * 3 + 2];
 			Chunk* chunk = chunks->getChunkByBlock(x, y, z);
 			if (chunk) {
-				int light = chunks->getLight(x, y, z, channel);
-				block v = chunks->get(x, y, z);
+				int light = chunk->lightmap->get(x, y, z, channel);
+				block v = chunk->getBlock(x, y, z);
 				if (v.id == 0 && light + 2 <= entry.light) {
-					chunk->lightmap->set(x - chunk->x * CHUNK_W, y - chunk->y * CHUNK_H, z - chunk->z * CHUNK_D, channel, entry.light - 1);
+					chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, entry.light - 1);
 					// chunk->modified = true;
 					lightentry nentry;
 					nentry.x = x;

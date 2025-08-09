@@ -26,6 +26,8 @@
 #include "glm/glm.hpp"
 #include "glm/ext.hpp"
 
+#include <chrono>
+
 int WIDTH = 1920;
 int HEIGHT = 1080;
 
@@ -51,12 +53,15 @@ int main()
 		return 1;
 	}
 
+	std::cout << 1 << '\n';
 
-	Chunks* chunks = new Chunks(6, 1, 4);
-	BlockRenderer renderer(chunks);
+	Chunks* world = new Chunks(2, 1, 2);
+	BlockRenderer renderer(world);
 
-	//Mesh** meshes = new Mesh * [chunks->volume];
-	//for (size_t i = 0; i < chunks->volume; i++)
+	std::cout << 2 << '\n';
+
+	//Mesh** meshes = new Mesh * [world->volume];
+	//for (size_t i = 0; i < world->volume; i++)
 	//	meshes[i] = nullptr;
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
@@ -65,68 +70,93 @@ int main()
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    /*
-	LightSolver* solverR = new LightSolver(chunks, 0);
-	LightSolver* solverG = new LightSolver(chunks, 1);
-	LightSolver* solverB = new LightSolver(chunks, 2);
-	LightSolver* solverS = new LightSolver(chunks, 3);
 
-	for (int y = 0; y < chunks->h * CHUNK_H; y++) {
-		for (int z = 0; z < chunks->d * CHUNK_D; z++) {
-			for (int x = 0; x < chunks->w * CHUNK_W; x++) {
-				block vox = chunks->get(x, y, z);
-				if (vox.id == 1) {
-					solverR->add(x, y, z, 15);
-					solverG->add(x, y, z, 15);
-					solverB->add(x, y, z, 15);
+	auto start = std::chrono::high_resolution_clock::now();
+
+	LightSolver* solverR = new LightSolver(world, 0);
+	LightSolver* solverG = new LightSolver(world, 1);
+	LightSolver* solverB = new LightSolver(world, 2);
+	LightSolver* solverS = new LightSolver(world, 3);
+	for (Chunk* chunk : world->iterable) {
+		const int gx = chunk->x*Chunk::WIDTH;
+		const int gy = chunk->y*Chunk::HEIGHT;
+		const int gz = chunk->z*Chunk::DEPTH;
+		for (int y = 0; y < Chunk::HEIGHT; y++) {
+			for (int z = 0; z < Chunk::DEPTH; z++) {
+				for (int x = 0; x < Chunk::WIDTH; x++) {
+					block vox = chunk->getBlock(x, y, z);
+					if (vox.id == 1) {
+						solverR->add(gx+x, gy+y, gz+z, 2);
+						solverG->add(gx+x, gy+y, gz+z, 2);
+						solverB->add(gx+x, gy+y, gz+z, 2);
+					}
+				}
+			}
+		}
+	}
+	std::cout << 3 << '\n';
+	for (Chunk* chunk : world->iterable) {
+		const int gx = chunk->x*Chunk::WIDTH;
+		const int gy = chunk->y*Chunk::HEIGHT;
+		const int gz = chunk->z*Chunk::DEPTH;
+		for (int z = 0; z < Chunk::DEPTH; z++) {
+			for (int x = 0; x < Chunk::WIDTH; x++) {
+				for (int y = Chunk::HEIGHT*chunk->y - 1; y >= 0; y--) {
+					block vox = chunk->getBlock(x, y, z);
+					if (vox.id != 0) {
+						break;
+					}
+					chunk->lightmap->setS(x, y, z, 0xF);
+				}
+			}
+		}
+	}
+	std::cout << 4 << '\n';
+	for (Chunk* chunk : world->iterable) {
+		const int gx = chunk->x*Chunk::WIDTH;
+		const int gy = chunk->y*Chunk::HEIGHT;
+		const int gz = chunk->z*Chunk::DEPTH;
+		for (int z = 0; z < Chunk::DEPTH; z++) {
+			for (int x = 0; x < Chunk::WIDTH; x++) {
+				for (int y = Chunk::HEIGHT*chunk->y - 1; y >= 0; y--) {
+					block vox = chunk->getBlock(x, y, z);
+					if (vox.id != 0) {
+						break;
+					}
+					if (
+						world->getLight(gx + x - 1, gy + y, gz + z, 3) == 0 ||
+						world->getLight(gx + x + 1, gy + y, gz + z, 3) == 0 ||
+						world->getLight(gx + x, gy + y - 1, gz + z, 3) == 0 ||
+						world->getLight(gx + x, gy + y + 1, gz + z, 3) == 0 ||
+						world->getLight(gx + x, gy + y, gz + z - 1, 3) == 0 ||
+						world->getLight(gx + x, gy + y, gz + z + 1, 3) == 0
+						) solverS->add(x, y, z);
+					world->getChunkByBlock(gx+x, gy+y, gz+z)->lightmap->setS(x, y, z, 0xF);
 				}
 			}
 		}
 	}
 
-	for (int z = 0; z < chunks->d * CHUNK_D; z++) {
-		for (int x = 0; x < chunks->w * CHUNK_W; x++) {
-			for (int y = chunks->h * CHUNK_H - 1; y >= 0; y--) {
-				block vox = chunks->get(x, y, z);
-				if (vox.id != 0) {
-					break;
-				}
-				chunks->getChunkByBlock(x, y, z)->lightmap->setS(x % CHUNK_W, y % CHUNK_H, z % CHUNK_D, 0xF);
-			}
-		}
-	}
-
-	for (int z = 0; z < chunks->d * CHUNK_D; z++) {
-		for (int x = 0; x < chunks->w * CHUNK_W; x++) {
-			for (int y = chunks->h * CHUNK_H - 1; y >= 0; y--) {
-				block vox = chunks->get(x, y, z);
-				if (vox.id != 0) {
-					break;
-				}
-				if (
-					chunks->getLight(x - 1, y, z, 3) == 0 ||
-					chunks->getLight(x + 1, y, z, 3) == 0 ||
-					chunks->getLight(x, y - 1, z, 3) == 0 ||
-					chunks->getLight(x, y + 1, z, 3) == 0 ||
-					chunks->getLight(x, y, z - 1, 3) == 0 ||
-					chunks->getLight(x, y, z + 1, 3) == 0
-					) {
-					solverS->add(x, y, z);
-				}
-				chunks->getChunkByBlock(x, y, z)->lightmap->setS(x % CHUNK_W, y % CHUNK_H, z % CHUNK_D, 0xF);
-			}
-		}
-	}
+	std::cout << 5 << '\n';
 
 	solverR->solve();
 	solverG->solve();
 	solverB->solve();
 	solverS->solve();
+	std::cout << 6 << '\n';
 
-	*/
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-	for (size_t i = 0; i < chunks->volume; ++i) renderer.render(chunks->chunks[i]);
+	std::cout << "Dynamic Light: " << duration.count() << " ms \n";
 
+
+	start = std::chrono::high_resolution_clock::now();
+	renderer.renderAll();
+	end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+	std::cout << "Render Time: " << duration.count() << " ms \n";
 
 	//IMGUI_CHECKVERSION();
 	//ImGui::CreateContext();
@@ -209,8 +239,8 @@ int main()
 		shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
 		texture->bind();
 
-		for (size_t i = 0; i < chunks->volume; i++) {
-			chunks->chunks[i]->chunk_draw.draw();
+		for (Chunk* chunk : world->iterable) {
+			chunk->chunk_draw.draw();
 		}
 
 		//ImGui::ShowDemoWindow();
@@ -233,7 +263,7 @@ int main()
 	// delete solverB;
 	// delete solverS;
 
-	delete chunks;
+	delete world;
 
 	Window::terminate();
 	return 0;
