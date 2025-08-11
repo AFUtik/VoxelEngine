@@ -9,19 +9,24 @@
 LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
 }
 
-void LightSolver::add(int x, int y, int z, uint8_t emission) {
+void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk) {
 	if (emission <= 1)
 		return;
-	lightentry entry {x, y, z, emission};
-	addqueue.push(entry);
 
-	Chunk* chunk = chunks->getChunkByBlock(x, y, z);
+	LightEntry entry;
+	entry.lx = x;
+	entry.ly = y;
+	entry.lz = z;
+	entry.light = emission;
+	entry.chunk = chunk;
+	addqueue.write(entry);
+
 	// chunk->modified = true;
-	chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, entry.light);
+	chunk->setLight(x, y, z, channel, entry.light);
 }
 
-void LightSolver::add(int x, int y, int z) {
-	add(x, y, z, chunks->getLight(x, y, z, channel));
+void LightSolver::addLocally(int x, int y, int z, Chunk* chunk) {
+	addLocally(x, y, z, chunk->getLight(x, y, z, channel), chunk);
 }
 
 void LightSolver::remove(int x, int y, int z) {
@@ -29,88 +34,84 @@ void LightSolver::remove(int x, int y, int z) {
 	if (chunk == nullptr)
 		return;
 
-	int light = chunk->lightmap->get(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel);
+	int light = chunk->getLight(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel);
 	if (light == 0) {
 		return;
 	}
 
-	lightentry entry;
-	entry.x = x;
-	entry.y = y;
-	entry.z = z;
+	LightEntry entry;
+	entry.lx = x;
+	entry.ly = y;
+	entry.lz = z;
 	entry.light = light;
-	remqueue.push(entry);
+	remqueue.write(entry);
 
-	chunk->lightmap->set(entry.x - chunk->x * Chunk::WIDTH, entry.y - chunk->y * Chunk::HEIGHT, entry.z - chunk->z * Chunk::DEPTH, channel, 0);
+	chunk->setLight(entry.lx - chunk->x * Chunk::WIDTH, entry.ly - chunk->y * Chunk::HEIGHT, entry.lz - chunk->z * Chunk::DEPTH, channel, 0);
 }
 
-void LightSolver::solve() {
-	const int coords[] = {
-			0, 0, 1,
-			0, 0,-1,
-			0, 1, 0,
-			0,-1, 0,
-			1, 0, 0,
-		   -1, 0, 0
-	};
+const int OFFS[6][3] = {
+	{0,0,1}, {0,0,-1}, {0,1,0}, {0,-1,0}, {1,0,0}, {-1,0,0}
+};
 
+void LightSolver::solve() {
 	while (!remqueue.empty()) {
-		lightentry entry = remqueue.front();
-		remqueue.pop();
+		LightEntry entry = remqueue.read();
 
 		for (size_t i = 0; i < 6; i++) {
-			int x = entry.x + coords[i * 3 + 0];
-			int y = entry.y + coords[i * 3 + 1];
-			int z = entry.z + coords[i * 3 + 2];
+			int x = entry.lx + OFFS[i][0];
+			int y = entry.ly + OFFS[i][1];
+			int z = entry.lz + OFFS[i][2];
 			Chunk* chunk = chunks->getChunkByBlock(x, y, z);
 			if (chunk) {
 				int light = chunks->getLight(x, y, z, channel);
 				if (light != 0 && light == entry.light - 1) {
-					lightentry nentry;
-					nentry.x = x;
-					nentry.y = y;
-					nentry.z = z;
+					LightEntry nentry;
+					nentry.lx = x;
+					nentry.ly = y;
+					nentry.lz = z;
 					nentry.light = light;
-					remqueue.push(nentry);
-					chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, 0);
+					remqueue.write(nentry);
+					chunk->setLight(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, 0);
 					// chunk->modified = true;
 				}
 				else if (light >= entry.light) {
-					lightentry nentry;
-					nentry.x = x;
-					nentry.y = y;
-					nentry.z = z;
+					LightEntry nentry;
+					nentry.lx = x;
+					nentry.ly = y;
+					nentry.lz = z;
 					nentry.light = light;
-					addqueue.push(nentry);
+					addqueue.write(nentry);
 				}
 			}
 		}
 	}
 
 	while (!addqueue.empty()) {
-		lightentry entry = addqueue.front();
-		addqueue.pop();
+		LightEntry entry = addqueue.read();
 
 		if (entry.light <= 1)
 			continue;
 
 		for (size_t i = 0; i < 6; i++) {
-			int x = entry.x + coords[i * 3 + 0];
-			int y = entry.y + coords[i * 3 + 1];
-			int z = entry.z + coords[i * 3 + 2];
-			Chunk* chunk = chunks->getChunkByBlock(x, y, z);
-			if (chunk) {
-				int light = chunk->lightmap->get(x, y, z, channel);
-				block v = chunk->getBlock(x, y, z);
-				if (v.id == 0 && light + 2 <= entry.light) {
-					chunk->lightmap->set(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, entry.light - 1);
+			const int x = entry.lx + OFFS[i][0];
+			const int y = entry.ly + OFFS[i][1];
+			const int z = entry.lz + OFFS[i][2];
+
+			int lx = 0, ly = 0, lz = 0;
+			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);
+			if (chunk != nullptr) {
+				const int light = chunk->getLight(lx, ly, lz, channel);
+				block v = chunk->getBlock(lx, ly, lz);
+				if (v.id == 0 && light + 2 <= entry.light) {;
+					chunk->setLight(lx, ly, lz, channel, entry.light - 1);
 					// chunk->modified = true;
-					lightentry nentry;
-					nentry.x = x;
-					nentry.y = y;
-					nentry.z = z;
+					LightEntry nentry;
+					nentry.lx = lx;
+					nentry.ly = ly;
+					nentry.lz = lz;
 					nentry.light = entry.light - 1;
-					addqueue.push(nentry);
+					nentry.chunk = chunk;
+					addqueue.write(nentry);
 				}
 			}
 		}

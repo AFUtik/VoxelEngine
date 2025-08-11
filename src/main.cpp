@@ -35,6 +35,11 @@ int HEIGHT = 1080;
 
 int main()
 {
+	Chunk::setChunkSize(16, 256, 16);
+
+	std::ios::sync_with_stdio(false);
+	std::cin.tie(nullptr);
+
 	Window::init(WIDTH, HEIGHT, "Test Window");
 	Events::init();
 
@@ -55,7 +60,7 @@ int main()
 
 	std::cout << 1 << '\n';
 
-	Chunks* world = new Chunks(2, 1, 2);
+	Chunks* world = new Chunks(10, 1, 10);
 	BlockRenderer renderer(world);
 
 	std::cout << 2 << '\n';
@@ -78,17 +83,14 @@ int main()
 	LightSolver* solverB = new LightSolver(world, 2);
 	LightSolver* solverS = new LightSolver(world, 3);
 	for (Chunk* chunk : world->iterable) {
-		const int gx = chunk->x*Chunk::WIDTH;
-		const int gy = chunk->y*Chunk::HEIGHT;
-		const int gz = chunk->z*Chunk::DEPTH;
 		for (int y = 0; y < Chunk::HEIGHT; y++) {
 			for (int z = 0; z < Chunk::DEPTH; z++) {
 				for (int x = 0; x < Chunk::WIDTH; x++) {
 					block vox = chunk->getBlock(x, y, z);
 					if (vox.id == 1) {
-						solverR->add(gx+x, gy+y, gz+z, 2);
-						solverG->add(gx+x, gy+y, gz+z, 2);
-						solverB->add(gx+x, gy+y, gz+z, 2);
+						solverR->addLocally(x, y, z, 0, chunk);
+						solverG->addLocally(x, y, z, 0, chunk);
+						solverB->addLocally(x, y, z, 0, chunk);
 					}
 				}
 			}
@@ -96,42 +98,37 @@ int main()
 	}
 	std::cout << 3 << '\n';
 	for (Chunk* chunk : world->iterable) {
-		const int gx = chunk->x*Chunk::WIDTH;
-		const int gy = chunk->y*Chunk::HEIGHT;
-		const int gz = chunk->z*Chunk::DEPTH;
+
 		for (int z = 0; z < Chunk::DEPTH; z++) {
 			for (int x = 0; x < Chunk::WIDTH; x++) {
-				for (int y = Chunk::HEIGHT*chunk->y - 1; y >= 0; y--) {
+				for (int y = Chunk::HEIGHT - 1; y >= 0; y--) {
 					block vox = chunk->getBlock(x, y, z);
 					if (vox.id != 0) {
 						break;
 					}
-					chunk->lightmap->setS(x, y, z, 0xF);
+					chunk->setLight(x, y, z, 3, 0xF);
 				}
 			}
 		}
 	}
 	std::cout << 4 << '\n';
 	for (Chunk* chunk : world->iterable) {
-		const int gx = chunk->x*Chunk::WIDTH;
-		const int gy = chunk->y*Chunk::HEIGHT;
-		const int gz = chunk->z*Chunk::DEPTH;
 		for (int z = 0; z < Chunk::DEPTH; z++) {
 			for (int x = 0; x < Chunk::WIDTH; x++) {
-				for (int y = Chunk::HEIGHT*chunk->y - 1; y >= 0; y--) {
+				for (int y = Chunk::HEIGHT - 1; y >= 0; y--) {
 					block vox = chunk->getBlock(x, y, z);
 					if (vox.id != 0) {
 						break;
 					}
 					if (
-						world->getLight(gx + x - 1, gy + y, gz + z, 3) == 0 ||
-						world->getLight(gx + x + 1, gy + y, gz + z, 3) == 0 ||
-						world->getLight(gx + x, gy + y - 1, gz + z, 3) == 0 ||
-						world->getLight(gx + x, gy + y + 1, gz + z, 3) == 0 ||
-						world->getLight(gx + x, gy + y, gz + z - 1, 3) == 0 ||
-						world->getLight(gx + x, gy + y, gz + z + 1, 3) == 0
-						) solverS->add(x, y, z);
-					world->getChunkByBlock(gx+x, gy+y, gz+z)->lightmap->setS(x, y, z, 0xF);
+						chunk->getBoundLight(x-1, y, z, 3) == 0 ||
+						chunk->getBoundLight(x+1, y, z, 3) == 0 ||
+						chunk->getBoundLight(x, y-1, z, 3) == 0 ||
+						chunk->getBoundLight(x, y+1, z, 3) == 0 ||
+						chunk->getBoundLight(x, y, z-1, 3) == 0 ||
+						chunk->getBoundLight(x, y, z+1, 3) == 0
+						) solverS->addLocally(x, y, z, chunk);
+					chunk->setLight(x, y, z, 3, 0xF);
 				}
 			}
 		}

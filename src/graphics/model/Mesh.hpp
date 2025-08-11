@@ -11,8 +11,8 @@
 class Mesh {
 	std::unique_ptr<VertexBuffer> buffer;
 
-	uint32_t VBO, VAO, EBO, IVBO;
-	uint32_t indices   = 0;
+	uint32_t VBO, VAO, IVBO;
+	uint32_t vertices  = 0;
 	uint32_t instances = 1;
 
 	uint32_t instance_buffer_size = 1;

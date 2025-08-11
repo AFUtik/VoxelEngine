@@ -34,8 +34,27 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 				int id = 0;
 				if (value <= 0.01)
 					id = 1;
-				getBlock(_x, _y, _z).id = id;
+				setBlock(_x, _y, _z, id);
 			}
 		}
 	}
+}
+
+uint8_t Chunk::getBoundLight(int lx, int ly, int lz, int channel) {
+	Chunk* chunk = findNeighbourChunk(lx, ly, lz);
+	if (chunk == nullptr) return 0;
+
+	int localX = lx - (chunk->x-x) * WIDTH;
+	int localY = ly - (chunk->y-y) * HEIGHT;
+	int localZ = lz - (chunk->z-z) * DEPTH;
+
+	return chunk->lightmap->get(localX, localY, localZ, channel);
+}
+
+uint8_t Chunk::getLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel) const {
+	return lightmap->get(lx, ly, lz, channel);
+}
+
+void Chunk::setLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel, int32_t emission) {
+	return lightmap->set(lx, ly, lz, channel, emission);
 }

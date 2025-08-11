@@ -21,13 +21,17 @@ Chunks::Chunks(int w, int h, int d)  {
 		for (int z = 0; z < d; z++) {
 			for (int x = 0; x < w; x++, index++) {
 				Chunk* chunk = new Chunk(x, y, z, noise);
+				uint64_t key = hash_xyz(x, y, z);
 
-				chunk_map[hash_xyz(x, y, z)] = std::unique_ptr<Chunk>(chunk);
+				chunk_map.emplace(key, std::unique_ptr<Chunk>(chunk));
 				iterable.push_back(chunk);
+
+				loadNeighbours(chunk);
 			}
 		}
 	}
 }
+
 
 block Chunks::getBlock(int x, int y, int z) {
 	int cx = x / Chunk::WIDTH;
@@ -38,7 +42,7 @@ block Chunks::getBlock(int x, int y, int z) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return block{0};
-	Chunk* chunk = chunk_map[hash_xyz(cx, cy, cz)].get();
+	Chunk* chunk = findChunkByCoordsSafe(cx, cy, cz);
 	if (!chunk) return block{0};
 	int lx = x - cx * Chunk::WIDTH;
 	int ly = y - cy * Chunk::HEIGHT;
@@ -55,7 +59,7 @@ unsigned char Chunks::getLight(int x, int y, int z, int channel) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return 0;
-	Chunk* chunk = chunk_map[hash_xyz(cx, cy, cz)].get();
+	Chunk* chunk = findChunkByCoordsSafe(cx, cy, cz);
 	if (chunk == nullptr) return 0;
 	int lx = x - cx * Chunk::WIDTH;
 	int ly = y - cy * Chunk::HEIGHT;
@@ -72,7 +76,7 @@ Chunk* Chunks::getChunkByBlock(int x, int y, int z) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return nullptr;
-	return chunk_map[hash_xyz(cx, cy, cz)].get();
+	return findChunkByCoordsSafe(cx, cy, cz);
 }
 
 Chunk* Chunks::getChunk(int32_t x, int32_t y, int32_t z) {

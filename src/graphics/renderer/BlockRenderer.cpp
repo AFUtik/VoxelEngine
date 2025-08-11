@@ -12,26 +12,6 @@
 
 #include "../../lighting/LightMap.hpp"
 
-inline void emitFace(
-	VertexConsumer& consumer,
-	float x, float y, float z,
-	const glm::vec3 offsets[4],
-	float u, float v, float uvsize, float l,
-	bool flip = false)
-{
-	for (int i = 0; i < 4; i++) {
-		const glm::vec3 &offset = offsets[i];
-
-		consumer.vertex(Vertex{x+offset.x, y+offset.y, z+offset.z,
-			i == 0 || i == 1 ? u + uvsize : u,
-			i == 0 || i == 3 ? v : v + uvsize,
-			0.0, 0.0, 0.0, l/15.0f});
-	}
-
-	if (flip) consumer.index(3, 1, 0).index(3, 2, 1).endIndex();
-	else      consumer.index(0, 1, 3).index(1, 2, 3).endIndex();
-}
-
 void BlockRenderer::renderAll() {
 	for(Chunk* chunk : world->iterable) {
 		mesher.makeChunk(chunk);

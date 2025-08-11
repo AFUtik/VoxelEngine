@@ -12,7 +12,7 @@ class BlockRenderer {
 	ChunkMesher mesher;
 	Chunks *world;
 public:
-	BlockRenderer(Chunks* world) :  mesher(world), world(world)  {};
+	BlockRenderer(Chunks* world) :  world(world)  {};
 
 	void renderAll();
 };

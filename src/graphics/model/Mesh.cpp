@@ -5,7 +5,7 @@
 #include <iostream>
 
 void Mesh::upload_buffers() {
-	indices = buffer->indices.size();
+	vertices = buffer->vertices.size();
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -24,16 +24,6 @@ void Mesh::upload_buffers() {
 		offset += size;
 		i++;
 	}
-
-	/* EBO BUFFER */
-	glGenBuffers(1, &EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(
-		GL_ELEMENT_ARRAY_BUFFER,
-		buffer->indices.size() * sizeof(GLuint),
-		buffer->indices.data(),
-		GL_STATIC_DRAW
-	);
 
 	glGenBuffers(1, &IVBO);
 	glBindBuffer(GL_ARRAY_BUFFER, IVBO);
@@ -69,12 +59,11 @@ void Mesh::updateInstanceBuffer(unsigned int index, unsigned int offset, const I
 Mesh::~Mesh() {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
 	glDeleteBuffers(1, &IVBO);
 }
 
 void Mesh::draw(unsigned int primitive) const {
 	glBindVertexArray(VAO);
-	glDrawElementsInstanced(GL_TRIANGLES, indices, GL_UNSIGNED_INT, 0, instances);
+	glDrawArraysInstanced(GL_TRIANGLES, 0, vertices, instances);
 	glBindVertexArray(0);
 }

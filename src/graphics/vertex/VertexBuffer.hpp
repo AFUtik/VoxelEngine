@@ -7,12 +7,10 @@
 
 struct VertexBuffer {
     std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
 
-	VertexBuffer(const uint32_t &vertices_size, const uint32_t &indices_size)
+	VertexBuffer(const uint32_t &vertices_size)
 	{
 		vertices.resize(vertices_size);
-		indices.resize(indices_size);
 	}
 	VertexBuffer() {}
 };
