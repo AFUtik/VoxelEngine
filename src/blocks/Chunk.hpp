@@ -57,6 +57,7 @@ public:
 		}
 		return -1;
 	}
+	
 
 	/*
 	 * Finds neighbour chunk of current chunk.
@@ -65,7 +66,7 @@ public:
 	 * @param bz local
 	 */
 	inline Chunk* findNeighbourChunk(int bx, int by, int bz) {
-		if (bx >= 0 && bx < ChunkInfo::WIDTH &&
+		if (bx >= 0 && bx < ChunkInfo::WIDTH  &&
 			by >= 0 && by < ChunkInfo::HEIGHT &&
 			bz >= 0 && bz < ChunkInfo::DEPTH)
 			return this;

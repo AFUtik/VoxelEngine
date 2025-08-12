@@ -10,12 +10,17 @@
 #include "Drawable.hpp"
 #include "../../blocks/Block.hpp"
 #include "../../blocks/Chunks.hpp"
+#include "blocks/ChunkInfo.hpp"
 
 using namespace glm;
 
 enum class direction {
     UP, DOWN, EAST, WEST, NORTH, SOUTH
 };
+
+static const int Dirs[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0}};
+
+static const float Normals[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0}};
 
 class ChunkMesher {
     Chunk* cur_chunk;
@@ -34,6 +39,118 @@ class ChunkMesher {
         lb = (cur_chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + cur_chunk->getBoundLight(x1, y1, z1, 2) + cur_chunk->getBoundLight(x2, y2, z2, 2)) / 5.0f / 15.0f;
         ls = (cur_chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + cur_chunk->getBoundLight(x1, y1, z1, 3) + cur_chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
     }
+
+    
+    Mesh generateGreedyMesh(VertexConsumer &consumer, Chunk *chunk) {
+        Mesh mesh;
+ 
+        // Буфер маски и вспомогательных данных
+        struct MaskCell { uint8_t id; uint8_t light; };
+        std::vector<MaskCell> mask(std::max({ChunkInfo::WIDTH, ChunkInfo::HEIGHT, ChunkInfo::DEPTH}) * std::max({ChunkInfo::WIDTH, ChunkInfo::HEIGHT, ChunkInfo::DEPTH}));
+    
+        // Проходим по 6 направлениям
+        for (int d = 0; d < 6; ++d) {
+            int dx = Dirs[d][0], dy = Dirs[d][1], dz = Dirs[d][2];
+            int u = (d==0||d==1) ? 0 : (d==2||d==3) ? 0 : 1; // индексы осей для проекции (упрощение)
+            int v = (d==0||d==1) ? 1 : (d==2||d==3) ? 2 : 2; // упрощенно
+    
+            // Шаги по основной оси
+            int xLen = ChunkInfo::WIDTH, yLen = ChunkInfo::HEIGHT, zLen = ChunkInfo::DEPTH;
+    
+            // Размеры проекции
+            int iMax = (d < 2) ? ChunkInfo::WIDTH : (d < 4) ? ChunkInfo::WIDTH : ChunkInfo::HEIGHT;
+            int jMax = (d < 2) ? ChunkInfo::HEIGHT : (d < 4) ? ChunkInfo::DEPTH : ChunkInfo::DEPTH;
+    
+            for (int slice = -1; slice < zLen; ++slice) {
+                // Build mask
+                int n = 0;
+                for (int j = 0; j < jMax; ++j) {
+                    for (int i = 0; i < iMax; ++i) {
+                        int x = i, y = j, z = slice;
+                        // transform depending on direction
+                        int ax = x, ay = y, az = z;
+                        if (d==0) { az = z; }
+                        // Get current and neighbor block
+                        Block cur {0};
+                        Block neigh {0};
+                        if (inBounds(ax, ay, az)) cur = getBlock(chunk, ax, ay, az);
+                        int nx = ax + dx, ny = ay + dy, nz = az + dz;
+                        if (inBounds(nx, ny, nz)) neigh = getBlock(chunk, nx, ny, nz);
+    
+                        // If current is opaque and neighbor is not -> face
+                        if (cur.isOpaque() && !neigh.isOpaque()) {
+                            mask[n++] = {cur.id, cur.light};
+                        } else {
+                            mask[n++] = {0,0};
+                        }
+                    }
+                }
+    
+                // Greedy merge mask
+                int w = iMax;
+                int h = jMax;
+                for (int j = 0; j < h; ++j) {
+                    for (int i = 0; i < w;) {
+                        auto mc = mask[j*w + i];
+                        if (mc.id == 0) { ++i; continue; }
+                        // find width
+                        int width = 1;
+                        while (i + width < w && mask[j*w + (i+width)].id == mc.id && mask[j*w + (i+width)].light == mc.light) ++width;
+                        // find height
+                        int height = 1;
+                        bool done = false;
+                        while (j + height < h && !done) {
+                            for (int k = 0; k < width; ++k) {
+                                auto mc2 = mask[(j+height)*w + (i+k)];
+                                if (mc2.id != mc.id || mc2.light != mc.light) { done = true; break; }
+                            }
+                            if (!done) ++height;
+                        }
+    
+                        // Create quad for the rectangle (i,j)-(i+width,j+height)
+                        // Compute 3D coordinates для вершин в зависимости от d
+                        float x0 = i, y0 = j;
+                        float x1 = i + width, y1 = j + height;
+    
+                        // Convert to world coords (упрощённо)
+                        Vertex v0, v1, v2, v3;
+                        // set positions depending on face direction (упрощение)
+                        // TODO: тут нужна точная трансформация по оси
+                        v0.x = x0; v0.y = y0; v0.z = slice + 1;
+                        v1.x = x1; v1.y = y0; v1.z = slice + 1;
+                        v2.x = x1; v2.y = y1; v2.z = slice + 1;
+                        v3.x = x0; v3.y = y1; v3.z = slice + 1;
+                        v0.u = 0; v0.v = 0; v1.u = 1; v1.v = 0; v2.u = 1; v2.v = 1; v3.u = 0; v3.v = 1;
+                        v0.nx = Normals[d][0]; v0.ny = Normals[d][1]; v0.nz = Normals[d][2];
+                        v1 = v0; v2 = v0; v3 = v0;
+                        v0.light = mc.light; v1.light = mc.light; v2.light = mc.light; v3.light = mc.light;
+    
+                        uint32_t baseIndex = (uint32_t)mesh.vertices.size();
+                        mesh.vertices.push_back(v0);
+                        mesh.vertices.push_back(v1);
+                        mesh.vertices.push_back(v2);
+                        mesh.vertices.push_back(v3);
+                        mesh.indices.push_back(baseIndex + 0);
+                        mesh.indices.push_back(baseIndex + 1);
+                        mesh.indices.push_back(baseIndex + 2);
+                        mesh.indices.push_back(baseIndex + 2);
+                        mesh.indices.push_back(baseIndex + 3);
+                        mesh.indices.push_back(baseIndex + 0);
+    
+                        // zero out mask
+                        for (int yy = 0; yy < height; ++yy) for (int xx = 0; xx < width; ++xx) mask[(j+yy)*w + (i+xx)] = {0,0};
+    
+                        i += width;
+                    }
+                }
+            }
+        }
+        
+        return mesh;
+    }
+
+    
+
     template<direction DIR>
     inline void makeFace(
         VertexConsumer &consumer,

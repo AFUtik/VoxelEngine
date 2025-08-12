@@ -31,8 +31,6 @@
 int WIDTH = 1920;
 int HEIGHT = 1080;
 
-//Original Code from https://github.com/MihailRis/VoxelEngine-Cpp
-
 int main()
 {
 	std::ios::sync_with_stdio(false);
@@ -58,7 +56,7 @@ int main()
 
 	std::cout << 1 << '\n';
 
-	Chunks* world = new Chunks(25, 1, 25, true);
+	Chunks* world = new Chunks(5, 1, 5, true);
 	BlockRenderer renderer(world);
 
 	std::cout << 2 << '\n';
@@ -68,7 +66,7 @@ int main()
 	//	meshes[i] = nullptr;
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
-
+	
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -76,22 +74,14 @@ int main()
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-
-
 	std::cout << 5 << '\n';
 
 	std::cout << 6 << '\n';
 
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-	std::cout << "Dynamic Light: " << duration.count() << " ms \n";
-
-
 	start = std::chrono::high_resolution_clock::now();
 	renderer.renderAll();
-	end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
 	std::cout << "Render Time: " << duration.count() << " ms \n";
 
