@@ -20,7 +20,7 @@ void BlockRenderer::renderAll() {
 		chunk->chunk_draw.mesh->updateInstanceBuffer(
 		0,
 		0,
-		translate(mat4(1.0f), vec3(chunk->x * Chunk::WIDTH + 0.5f, chunk->y * Chunk::HEIGHT + 0.5f, chunk->z * Chunk::DEPTH + 0.5f))
+		translate(mat4(1.0f), vec3(chunk->x * ChunkInfo::WIDTH + 0.5f, chunk->y * ChunkInfo::HEIGHT + 0.5f, chunk->z * ChunkInfo::DEPTH + 0.5f))
 		);
 	}
 }

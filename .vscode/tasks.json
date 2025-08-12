@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build & Run",
+            "type": "shell",
+            "command": "cmake --build out/build/VoxelEngine --config Debug && E:/Cpp/VoxelEngine/out/build/VoxelEngine/Debug/VoxelEngine.exe",
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/d", "/c"]
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

@@ -28,6 +28,8 @@ public:
 	void draw(unsigned int primitive) const;
 
 	void updateInstanceBuffer(unsigned int index, unsigned int offset, const Instance& instance);
+
+	void updateVBO(unsigned int offset, unsigned int amount);
 };
 
 #endif /* GRAPHICS_MESH_H_ */

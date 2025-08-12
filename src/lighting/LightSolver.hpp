@@ -3,6 +3,7 @@
 
 #include <queue>
 #include <cstdint>
+#include <structures/RingBuffer.hpp>
 
 class Chunks;
 class Chunk;
@@ -17,29 +18,7 @@ struct LightEntry {
 	Chunk *chunk = nullptr;
 };
 
-template <typename T, size_t UPDATES>
-struct RingBuffer {
-private:
-	T buffer[UPDATES];
-	int head = 0, tail = 0;
-public:
-	inline void write(LightEntry entry) {
-		buffer[head] = entry;
-		head = (head + 1) % UPDATES;
-	}
-
-	inline T& read() {
-		T& entry = buffer[tail];
-		tail = (tail + 1) % UPDATES;
-		return entry;
-	}
-
-	inline bool empty() const {
-		return head == tail;
-	}
-};
-
-constexpr int MAX_LIGHT_UPDATES = 1 << 18; // 65536
+constexpr int MAX_LIGHT_UPDATES = 1 << 20; // 65536
 
 class LightSolver {
 	RingBuffer<LightEntry, MAX_LIGHT_UPDATES> addqueue;

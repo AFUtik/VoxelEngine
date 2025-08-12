@@ -166,9 +166,9 @@ public:
         cur_chunk = chunk;
 
         VertexConsumer consumer = chunk->chunk_draw.mesh->getConsumer();
-        for (int y = 0; y < Chunk::HEIGHT; y++) {
-            for (int z = 0; z < Chunk::DEPTH; z++) {
-                for (int x = 0; x < Chunk::WIDTH; x++) {
+        for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
+            for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+                for (int x = 0; x < ChunkInfo::WIDTH; x++) {
                     block vox = chunk->getBlock(x, y, z);
                     unsigned int id = vox.id;
 

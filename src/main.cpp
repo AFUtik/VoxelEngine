@@ -35,8 +35,6 @@ int HEIGHT = 1080;
 
 int main()
 {
-	Chunk::setChunkSize(16, 256, 16);
-
 	std::ios::sync_with_stdio(false);
 	std::cin.tie(nullptr);
 
@@ -60,7 +58,7 @@ int main()
 
 	std::cout << 1 << '\n';
 
-	Chunks* world = new Chunks(10, 1, 10);
+	Chunks* world = new Chunks(25, 1, 25, true);
 	BlockRenderer renderer(world);
 
 	std::cout << 2 << '\n';
@@ -78,68 +76,10 @@ int main()
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-	LightSolver* solverR = new LightSolver(world, 0);
-	LightSolver* solverG = new LightSolver(world, 1);
-	LightSolver* solverB = new LightSolver(world, 2);
-	LightSolver* solverS = new LightSolver(world, 3);
-	for (Chunk* chunk : world->iterable) {
-		for (int y = 0; y < Chunk::HEIGHT; y++) {
-			for (int z = 0; z < Chunk::DEPTH; z++) {
-				for (int x = 0; x < Chunk::WIDTH; x++) {
-					block vox = chunk->getBlock(x, y, z);
-					if (vox.id == 1) {
-						solverR->addLocally(x, y, z, 0, chunk);
-						solverG->addLocally(x, y, z, 0, chunk);
-						solverB->addLocally(x, y, z, 0, chunk);
-					}
-				}
-			}
-		}
-	}
-	std::cout << 3 << '\n';
-	for (Chunk* chunk : world->iterable) {
 
-		for (int z = 0; z < Chunk::DEPTH; z++) {
-			for (int x = 0; x < Chunk::WIDTH; x++) {
-				for (int y = Chunk::HEIGHT - 1; y >= 0; y--) {
-					block vox = chunk->getBlock(x, y, z);
-					if (vox.id != 0) {
-						break;
-					}
-					chunk->setLight(x, y, z, 3, 0xF);
-				}
-			}
-		}
-	}
-	std::cout << 4 << '\n';
-	for (Chunk* chunk : world->iterable) {
-		for (int z = 0; z < Chunk::DEPTH; z++) {
-			for (int x = 0; x < Chunk::WIDTH; x++) {
-				for (int y = Chunk::HEIGHT - 1; y >= 0; y--) {
-					block vox = chunk->getBlock(x, y, z);
-					if (vox.id != 0) {
-						break;
-					}
-					if (
-						chunk->getBoundLight(x-1, y, z, 3) == 0 ||
-						chunk->getBoundLight(x+1, y, z, 3) == 0 ||
-						chunk->getBoundLight(x, y-1, z, 3) == 0 ||
-						chunk->getBoundLight(x, y+1, z, 3) == 0 ||
-						chunk->getBoundLight(x, y, z-1, 3) == 0 ||
-						chunk->getBoundLight(x, y, z+1, 3) == 0
-						) solverS->addLocally(x, y, z, chunk);
-					chunk->setLight(x, y, z, 3, 0xF);
-				}
-			}
-		}
-	}
 
 	std::cout << 5 << '\n';
 
-	solverR->solve();
-	solverG->solve();
-	solverB->solve();
-	solverS->solve();
 	std::cout << 6 << '\n';
 
 	auto end = std::chrono::high_resolution_clock::now();

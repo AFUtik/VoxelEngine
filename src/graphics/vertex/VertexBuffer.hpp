@@ -2,17 +2,12 @@
 #define VERTEXBUFFER_HPP
 
 #include "VertexInfo.hpp"
-#include <cstdint>
-#include <vector>
+#include <structures/PackedFreelist.hpp>
 
 struct VertexBuffer {
-    std::vector<Vertex> vertices;
+    packed_freelist<Vertex> vertices;
 
-	VertexBuffer(const uint32_t &vertices_size)
-	{
-		vertices.resize(vertices_size);
-	}
-	VertexBuffer() {}
+	VertexBuffer() : vertices(64) {}
 };
 
 #endif

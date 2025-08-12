@@ -11,6 +11,8 @@ build/
 lib/
 vcpkg_installed/
 
+out/
+
 # User-specific files
 *.rsuser
 *.suo

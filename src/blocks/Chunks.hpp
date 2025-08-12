@@ -12,6 +12,8 @@
 
 #include "Chunk.hpp"
 
+#include "../lighting/LightSolver.hpp"
+
 class Chunk;
 struct block;
 
@@ -21,6 +23,11 @@ inline uint64_t hash_xyz(int x, int y, int z) noexcept {
 
 class Chunks {
 	std::unordered_map<uint64_t, std::unique_ptr<Chunk>> chunk_map;
+
+	LightSolver* solverR = nullptr;
+	LightSolver* solverG = nullptr;
+	LightSolver* solverB = nullptr;
+	LightSolver* solverS = nullptr;
 
 	inline Chunk* findChunkByCoordsSafe(int cx, int cy, int cz) {
 		auto it = chunk_map.find(hash_xyz(cx, cy, cz));
@@ -46,7 +53,7 @@ class Chunks {
 	}
 public:
 	std::vector<Chunk*> iterable;
-	Chunks(int w, int h, int d);
+	Chunks(int w, int h, int d, bool lighting);
 
 	block getBlock(int x, int y, int z);
 	Chunk* getChunk(int x, int y, int z);

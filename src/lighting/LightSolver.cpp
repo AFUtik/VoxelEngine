@@ -34,7 +34,7 @@ void LightSolver::remove(int x, int y, int z) {
 	if (chunk == nullptr)
 		return;
 
-	int light = chunk->getLight(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel);
+	int light = chunk->getLight(x - chunk->x * ChunkInfo::WIDTH, y - chunk->y * ChunkInfo::HEIGHT, z - chunk->z * ChunkInfo::DEPTH, channel);
 	if (light == 0) {
 		return;
 	}
@@ -46,7 +46,7 @@ void LightSolver::remove(int x, int y, int z) {
 	entry.light = light;
 	remqueue.write(entry);
 
-	chunk->setLight(entry.lx - chunk->x * Chunk::WIDTH, entry.ly - chunk->y * Chunk::HEIGHT, entry.lz - chunk->z * Chunk::DEPTH, channel, 0);
+	chunk->setLight(entry.lx - chunk->x * ChunkInfo::WIDTH, entry.ly - chunk->y * ChunkInfo::HEIGHT, entry.lz - chunk->z * ChunkInfo::DEPTH, channel, 0);
 }
 
 const int OFFS[6][3] = {
@@ -71,7 +71,7 @@ void LightSolver::solve() {
 					nentry.lz = z;
 					nentry.light = light;
 					remqueue.write(nentry);
-					chunk->setLight(x - chunk->x * Chunk::WIDTH, y - chunk->y * Chunk::HEIGHT, z - chunk->z * Chunk::DEPTH, channel, 0);
+					chunk->setLight(x - chunk->x * ChunkInfo::WIDTH, y - chunk->y * ChunkInfo::HEIGHT, z - chunk->z * ChunkInfo::DEPTH, channel, 0);
 					// chunk->modified = true;
 				}
 				else if (light >= entry.light) {
