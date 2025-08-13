@@ -27,6 +27,7 @@
 #include "glm/ext.hpp"
 
 #include <chrono>
+#include <thread>
 
 int WIDTH = 1920;
 int HEIGHT = 1080;
@@ -79,7 +80,7 @@ int main()
 	std::cout << 6 << '\n';
 
 	start = std::chrono::high_resolution_clock::now();
-	renderer.renderAll();
+	renderer.generateMeshes();
 	auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -92,91 +93,104 @@ int main()
 	//ImGui_ImplGlfw_InitForOpenGL(Window::window, true);
 	//ImGui_ImplOpenGL3_Init("#version 330");
 
-	Camera* camera = new Camera(glm::vec3(0, 0, 1), glm::radians(90.0f));
-
-	float lastTime = glfwGetTime();
-	float delta = 0.0f;
+	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
+	camera->originPosition = camera->x_dir*(10000000.0f/2);
+	
 
 	float camX = 0.0f;
 	float camY = 0.0f;
 
-	float speed = 25;
+	double speed = 25;
+
+	double lastTime = glfwGetTime();
+	const double target_fps = 120.0;
+	const double H = 1.0f / target_fps;
+
+	double timeAccu = 0.0f;
+
 
 	Events::toggle_cursor();
 	while (!Window::isShouldClose()) {
-		float currentTime = glfwGetTime();
-		delta = currentTime - lastTime;
+		double currentTime = glfwGetTime();
+		double frameTime = currentTime - lastTime;
 		lastTime = currentTime;
-
-		if (Events::jpressed(GLFW_KEY_ESCAPE)) {
-			Window::setShouldClose(true);
-		}
-		if (Events::jpressed(GLFW_KEY_TAB)) {
-			Events::toggle_cursor();
-		}
-
-		if (Events::pressed(GLFW_KEY_W)) {
-			camera->position += camera->z_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_S)) {
-			camera->position -= camera->z_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_D)) {
-			camera->position += camera->x_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_A)) {
-			camera->position -= camera->x_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_SPACE)) {
-			camera->y_dir = glm::vec3(0, 1, 0);
-
-			camera->position += camera->y_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
-			camera->y_dir = glm::vec3(0, 1, 0);
-
-			camera->position -= camera->y_dir * delta * speed;
-		}
-		if (Events::pressed(GLFW_KEY_0)) {
-			camera->set_xyz(0, 0, 1);
-		}
-
-		if (Events::_cursor_locked) {
-			camY += -Events::deltaY / Window::height * 2;
-			camX += -Events::deltaX / Window::height * 2;
-
-			if (camY < -radians(89.0f)) {
-				camY = -radians(89.0f);
-			}
-			if (camY > radians(89.0f)) {
-				camY = radians(89.0f);
-			}
-
-			camera->rotation = mat4(1.0f);
-			camera->rotate(camY, camX, 0);
-		}
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		//ImGui_ImplOpenGL3_NewFrame();
-		//ImGui_ImplGlfw_NewFrame();
-		//ImGui::NewFrame();
 		
-		shader->use();
-		shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
-		texture->bind();
+		timeAccu += frameTime;
+		if (timeAccu >= H) {
+			if (Events::jpressed(GLFW_KEY_ESCAPE)) {
+				Window::setShouldClose(true);
+			}
+			if (Events::jpressed(GLFW_KEY_TAB)) {
+				Events::toggle_cursor();
+			}
 
-		for (Chunk* chunk : world->iterable) {
-			chunk->chunk_draw.draw();
+			if (Events::pressed(GLFW_KEY_W)) {
+				camera->originPosition += camera->z_dir * H * speed;
+			}
+			if (Events::pressed(GLFW_KEY_S)) {
+				camera->originPosition -= camera->z_dir * H * speed;
+			}
+			if (Events::pressed(GLFW_KEY_D)) {
+				camera->originPosition += camera->x_dir * H * speed;
+			}
+			if (Events::pressed(GLFW_KEY_A)) {
+				camera->originPosition -= camera->x_dir * H * speed;
+			}
+			if (Events::pressed(GLFW_KEY_SPACE)) {
+				camera->y_dir = glm::vec3(0, 1, 0);
+
+				camera->originPosition += camera->y_dir * H * speed;
+			}
+			if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
+				camera->y_dir = glm::vec3(0, 1, 0);
+
+				camera->originPosition -= camera->y_dir * H* speed;
+			}
+			if (Events::pressed(GLFW_KEY_0)) {
+				camera->set_xyz(0, 0, 1);
+			}
+
+			if (Events::_cursor_locked) {
+				camY += -Events::deltaY / Window::height * 2;
+				camX += -Events::deltaX / Window::height * 2;
+
+				if (camY < -radians(89.0f)) {
+					camY = -radians(89.0f);
+				}
+				if (camY > radians(89.0f)) {
+					camY = radians(89.0f);
+				}
+
+				camera->rotation = mat4(1.0f);
+				camera->rotate(camY, camX, 0);
+			}
+			camera->originRebase();
+
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			//ImGui_ImplOpenGL3_NewFrame();
+			//ImGui_ImplGlfw_NewFrame();
+			//ImGui::NewFrame();
+			
+			shader->use();
+			shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
+			texture->bind();
+
+			renderer.renderAll(shader->id, camera->getRebaseShift());
+
+			//ImGui::ShowDemoWindow();
+
+			//ImGui::Render();
+			//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+			Window::swapBuffers();
+			Events::pullEvents();
+
+			timeAccu -= H;
+		} else {
+			double sleepTime = H - timeAccu;
+        	std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
 		}
-
-		//ImGui::ShowDemoWindow();
-
-		//ImGui::Render();
-		//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-		Window::swapBuffers();
-		Events::pullEvents();
 	}
 	//ImGui_ImplOpenGL3_Shutdown();
 	//ImGui_ImplGlfw_Shutdown();

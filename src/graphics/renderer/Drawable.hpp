@@ -9,17 +9,18 @@
 #include <GL/glew.h>
 
 #include "../model/Mesh.hpp"
+#include "../Transform.hpp"
 
 class DrawableObject {
 protected:
-
-public:
     std::unique_ptr<Mesh> mesh;
-    glm::mat4 model;
-    DrawableObject() : mesh(new Mesh), model(glm::mat4(1.0f)) {}
+    
+    Transform transform;
+public:
+    DrawableObject() : mesh(new Mesh) {}
 
     inline Mesh* getMesh() {return mesh.get();}
-    inline glm::mat4& getTransform() {return model;}
+    inline Transform& getTransform() {return transform;}
 
     inline void draw() {mesh->draw(GL_TRIANGLES);}
 };

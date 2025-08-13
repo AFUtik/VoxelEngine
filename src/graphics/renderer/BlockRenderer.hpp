@@ -14,7 +14,8 @@ class BlockRenderer {
 public:
 	BlockRenderer(Chunks* world) :  world(world)  {};
 
-	void renderAll();
+	void generateMeshes();
+	void renderAll(uint32_t shader, const glm::dvec3& camera_pos);
 };
 
 #endif // !BLOCKRENDERER_HPP

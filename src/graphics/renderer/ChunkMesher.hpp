@@ -10,7 +10,7 @@
 #include "Drawable.hpp"
 #include "../../blocks/Block.hpp"
 #include "../../blocks/Chunks.hpp"
-#include "blocks/ChunkInfo.hpp"
+#include "../../blocks/ChunkInfo.hpp"
 
 using namespace glm;
 
@@ -40,7 +40,7 @@ class ChunkMesher {
         ls = (cur_chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + cur_chunk->getBoundLight(x1, y1, z1, 3) + cur_chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
     }
 
-    
+    /*
     Mesh generateGreedyMesh(VertexConsumer &consumer, Chunk *chunk) {
         Mesh mesh;
  
@@ -148,7 +148,7 @@ class ChunkMesher {
         
         return mesh;
     }
-
+    */
     
 
     template<direction DIR>
@@ -282,7 +282,7 @@ public:
     inline void makeChunk(Chunk* chunk) {
         cur_chunk = chunk;
 
-        VertexConsumer consumer = chunk->chunk_draw.mesh->getConsumer();
+        VertexConsumer consumer = chunk->chunk_draw.getMesh()->getConsumer();
         for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
             for (int z = 0; z < ChunkInfo::DEPTH; z++) {
                 for (int x = 0; x < ChunkInfo::WIDTH; x++) {

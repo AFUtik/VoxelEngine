@@ -3,18 +3,18 @@
 
 #include <glm/ext.hpp>
 
-Camera::Camera(vec3 position, float fov) : position(position), fov(fov), rotation(1.0f) {
+Camera::Camera(dvec3 position, float fov) : originPosition(position), fov(fov), rotation(1.0f) {
 	updateVectors();
 }
 
-void Camera::set_xyz(float x, float y, float z) {
-	position = glm::vec3(x, y, z);
+void Camera::set_xyz(double x, double y, double z) {
+	originPosition = glm::vec3(x, y, z);
 }
 
 void Camera::updateVectors() {
-	x_dir = vec3(rotation * vec4(1, 0, 0, 1));
-	y_dir = vec3(rotation * vec4(0, 1, 0, 1));
-	z_dir = vec3(rotation * vec4(0, 0, -1, 1));
+	x_dir = dvec3(rotation * vec4(1, 0, 0, 1));
+	y_dir = dvec3(rotation * vec4(0, 1, 0, 1));
+	z_dir = dvec3(rotation * vec4(0, 0, -1, 1));
 	
 }
 
@@ -32,5 +32,17 @@ mat4 Camera::getProjection() {
 }
 
 mat4 Camera::getView() {
-	return glm::lookAt(position, position + z_dir, y_dir);
+	return glm::lookAt(originPosition, originPosition + z_dir, y_dir);
+}
+
+dvec3 Camera::getRebaseShift() {
+	const double REBASE_GRANULARITY = 1000.0;
+
+	return glm::floor(originPosition / REBASE_GRANULARITY) * REBASE_GRANULARITY;
+}
+
+void Camera::originRebase() {
+	dvec3 shift = getRebaseShift();
+	if (shift == dvec3(0.0)) return;
+	originPosition -= shift;
 }
