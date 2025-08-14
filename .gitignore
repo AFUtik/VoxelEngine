@@ -10,7 +10,7 @@ CMakePresets.json
 build/
 lib/
 vcpkg_installed/
-
+.vscode/
 out/
 
 # User-specific files
