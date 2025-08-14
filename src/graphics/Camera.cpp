@@ -2,12 +2,13 @@
 #include "../window/Window.hpp"
 
 #include <glm/ext.hpp>
+#include <iostream>
 
 Camera::Camera(dvec3 position, float fov) : originPosition(position), fov(fov), rotation(1.0f) {
 	updateVectors();
 }
 
-void Camera::set_xyz(double x, double y, double z) {
+void Camera::set(double x, double y, double z) {
 	originPosition = glm::vec3(x, y, z);
 }
 
@@ -15,7 +16,6 @@ void Camera::updateVectors() {
 	x_dir = dvec3(rotation * vec4(1, 0, 0, 1));
 	y_dir = dvec3(rotation * vec4(0, 1, 0, 1));
 	z_dir = dvec3(rotation * vec4(0, 0, -1, 1));
-	
 }
 
 void Camera::rotate(float x, float y, float z) {
@@ -26,23 +26,30 @@ void Camera::rotate(float x, float y, float z) {
 	updateVectors();
 }
 
+void Camera::translate(const glm::dvec3 &dp) {
+	originPosition += dp;
+}
+
 mat4 Camera::getProjection() {
 	float aspect = (float)Window::width / (float)Window::height;
 	return glm::perspective(fov, aspect, 0.1f, 500.0f);
 }
 
 mat4 Camera::getView() {
-	return glm::lookAt(originPosition, originPosition + z_dir, y_dir);
+	return glm::lookAt(offsetPosition, offsetPosition + z_dir, y_dir);
 }
 
 dvec3 Camera::getRebaseShift() {
-	const double REBASE_GRANULARITY = 1000.0;
-
-	return glm::floor(originPosition / REBASE_GRANULARITY) * REBASE_GRANULARITY;
+	return glm::trunc((originPosition-accumulatedShift) / REBASE_GRANULARITY) * REBASE_GRANULARITY;
 }
 
 void Camera::originRebase() {
-	dvec3 shift = getRebaseShift();
-	if (shift == dvec3(0.0)) return;
-	originPosition -= shift;
+    dvec3 shift = getRebaseShift();
+    if (shift == dvec3(0.0)) {
+		offsetPosition = originPosition - accumulatedShift;
+		rebased_dirty = false;
+		return;
+	}
+	accumulatedShift += shift;
+	rebased_dirty = true;
 }

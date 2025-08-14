@@ -3,6 +3,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>	
 
+#include "glm/ext/vector_double3.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/model/Mesh.hpp"
 #include "graphics/model/Texture.hpp"
@@ -58,7 +59,7 @@ int main()
 	std::cout << 1 << '\n';
 
 	Chunks* world = new Chunks(5, 1, 5, true);
-	BlockRenderer renderer(world);
+	BlockRenderer renderer(world, shader);
 
 	std::cout << 2 << '\n';
 
@@ -80,7 +81,9 @@ int main()
 	std::cout << 6 << '\n';
 
 	start = std::chrono::high_resolution_clock::now();
+
 	renderer.generateMeshes();
+
 	auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -94,7 +97,7 @@ int main()
 	//ImGui_ImplOpenGL3_Init("#version 330");
 
 	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
-	camera->originPosition = camera->x_dir*(10000000.0f/2);
+	camera->translate(camera->xdir());
 	
 
 	float camX = 0.0f;
@@ -103,7 +106,7 @@ int main()
 	double speed = 25;
 
 	double lastTime = glfwGetTime();
-	const double target_fps = 120.0;
+	const double target_fps = 165.0;
 	const double H = 1.0f / target_fps;
 
 	double timeAccu = 0.0f;
@@ -125,29 +128,29 @@ int main()
 			}
 
 			if (Events::pressed(GLFW_KEY_W)) {
-				camera->originPosition += camera->z_dir * H * speed;
+				camera->translate(camera->zdir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_S)) {
-				camera->originPosition -= camera->z_dir * H * speed;
+				camera->translate(-camera->zdir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_D)) {
-				camera->originPosition += camera->x_dir * H * speed;
+				camera->translate(camera->xdir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_A)) {
-				camera->originPosition -= camera->x_dir * H * speed;
+				camera->translate(-camera->xdir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {
-				camera->y_dir = glm::vec3(0, 1, 0);
+				camera->setydir(glm::dvec3(0, 1, 0));
 
-				camera->originPosition += camera->y_dir * H * speed;
+				camera->translate(camera->ydir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
-				camera->y_dir = glm::vec3(0, 1, 0);
+				camera->setydir(glm::dvec3(0, 1, 0));
 
-				camera->originPosition -= camera->y_dir * H* speed;
+				camera->translate(-camera->ydir() * H * speed);
 			}
 			if (Events::pressed(GLFW_KEY_0)) {
-				camera->set_xyz(0, 0, 1);
+				camera->set(0, 0, 0);
 			}
 
 			if (Events::_cursor_locked) {
@@ -161,22 +164,24 @@ int main()
 					camY = radians(89.0f);
 				}
 
-				camera->rotation = mat4(1.0f);
+				camera->setRotation(glm::mat4(1.0f));
 				camera->rotate(camY, camX, 0);
 			}
-			camera->originRebase();
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			camera->originRebase();
 
 			//ImGui_ImplOpenGL3_NewFrame();
 			//ImGui_ImplGlfw_NewFrame();
 			//ImGui::NewFrame();
 			
 			shader->use();
+			
 			shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
 			texture->bind();
 
-			renderer.renderAll(shader->id, camera->getRebaseShift());
+			renderer.renderAll(camera);
 
 			//ImGui::ShowDemoWindow();
 

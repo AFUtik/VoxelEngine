@@ -5,24 +5,35 @@
 #ifndef DRAWABLE_HPP
 #define DRAWABLE_HPP
 
+#include <glm/ext.hpp>
 #include <memory>
 #include <GL/glew.h>
 
 #include "../model/Mesh.hpp"
 #include "../Transform.hpp"
 
+#include "../Shader.hpp"
+
+class Camera;
+
 class DrawableObject {
 protected:
     std::unique_ptr<Mesh> mesh;
     
     Transform transform;
+    Shader* shader = nullptr;
 public:
     DrawableObject() : mesh(new Mesh) {}
 
     inline Mesh* getMesh() {return mesh.get();}
     inline Transform& getTransform() {return transform;}
+    
+    inline void loadShader(Shader* shader) {this->shader = shader;}
 
-    inline void draw() {mesh->draw(GL_TRIANGLES);}
+    virtual void draw(Camera* camera) {
+        glUniformMatrix4fv(shader->model_loc, 1, GL_FALSE, glm::value_ptr(transform.model(camera)));
+        mesh->draw(3);
+    };
 };
 
 #endif //DRAWABLE_HPP

@@ -5,8 +5,19 @@
 #ifndef RENDERER_HPP
 #define RENDERER_HPP
 
+#include <vector>
+
+class Shader;
+class Camera;
+class Drawable;
+
 class Renderer {
+    std::vector<Drawable*> drawable; 
+
+    Camera* camera; 
+    Shader* shader;
 public:
+    Renderer(Camera* camera, Shader* shader) : camera(camera), shader(shader) {}
 };
 
-#endif //RENDERER_HPP
+#endif //RENDitERER_HPP

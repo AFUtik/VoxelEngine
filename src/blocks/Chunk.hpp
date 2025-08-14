@@ -39,6 +39,7 @@ class Chunk {
 public:
 	DrawableObject chunk_draw;
 
+	// World Pos //
 	int32_t x, y, z;
 
 	Chunk(int x, int y, int z) : x(x), y(y), z(z) {}

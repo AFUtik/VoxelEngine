@@ -7,6 +7,9 @@
 class Shader {
 public:
 	unsigned int id;
+
+	uint32_t model_loc;
+
 	Shader(unsigned int id);
 	~Shader();
 

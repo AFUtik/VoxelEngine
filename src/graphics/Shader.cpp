@@ -10,8 +10,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-// Origin -> https://github.com/MihailRis/VoxelEngine-Cpp/blob/main/src/graphics/core/Shader.cpp
-
 const static std::string ABSOLUTE_PATH = "E:/Cpp/VoxelEngine/";
 
 Shader::Shader(unsigned int id) : id(id) {
@@ -107,6 +105,8 @@ Shader* load_shader(std::string vertexFile, std::string fragmentFile) {
 
     glDeleteShader(vertex);
     glDeleteShader(fragment);
-
-    return new Shader(id);
+    
+    Shader* shader = new Shader(id);
+    shader->model_loc = glGetUniformLocation(id, "model");
+    return shader;
 }
