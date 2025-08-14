@@ -2,6 +2,7 @@
 #define CHUNKS_HPP
 
 #include <cstdint>
+#include <unordered_set>
 #include <vector>
 #include <map>
 #include <unordered_map>
@@ -13,16 +14,26 @@
 #include "Chunk.hpp"
 
 #include "../lighting/LightSolver.hpp"
+#include "blocks/ChunkInfo.hpp"
 
 class Chunk;
 struct block;
 
-inline uint64_t hash_xyz(int x, int y, int z) noexcept {
-	return (static_cast<uint64_t>(x) * 73856093) ^ (static_cast<uint64_t>(y) * 19349663) ^ (static_cast<uint64_t>(z) * 83492791);
+inline uint64_t compress_xz(int32_t x, int32_t z) {
+	return ((long)x & 0xFFFFFFFFL) | (((long)z & 0xFFFFFFFFL) << 32);
 }
 
 class Chunks {
-	std::unordered_map<uint64_t, std::unique_ptr<Chunk>> chunk_map;
+	/*
+	 * Used to find a chunk near player.
+	 */
+	std::unordered_map<uint64_t, std::unique_ptr<Chunk>> chunkMap;
+
+	/*
+	 * Used to not close chunks and store them as compressed chunks using RLE algorithm.
+	 */
+	std::unordered_map<uint64_t, std::unique_ptr<ChunkRLE>> rleChunkMap;
+
 
 	LightSolver* solverR = nullptr;
 	LightSolver* solverG = nullptr;
@@ -61,8 +72,7 @@ public:
 	unsigned char getLight(int x, int y, int z, int channel);
 	void set(int x, int y, int z, int id);
 
-	void write(unsigned char* dest);
-	void read(unsigned char* source);
+
 };
 
 #endif // !CHUNKS_HPP

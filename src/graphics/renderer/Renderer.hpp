@@ -7,17 +7,23 @@
 
 #include <vector>
 
+class Frustum;
 class Shader;
 class Camera;
 class Drawable;
 
 class Renderer {
+protected:    
     std::vector<Drawable*> drawable; 
 
-    Camera* camera; 
-    Shader* shader;
+    Camera* camera = nullptr; 
+    Shader* shader = nullptr;
+
+    Frustum* frustum = nullptr;
+
+    friend class DrawContext;
 public:
-    Renderer(Camera* camera, Shader* shader) : camera(camera), shader(shader) {}
+    virtual void render() = 0;
 };
 
 #endif //RENDitERER_HPP

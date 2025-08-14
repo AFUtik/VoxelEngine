@@ -15,6 +15,8 @@
 #include "../../graphics/Transform.hpp"
 #include "../../blocks/ChunkInfo.hpp"
 
+#include "../Frustum.hpp"
+
 void BlockRenderer::generateMeshes() {
 	for(Chunk* chunk : world->iterable) {
 		mesher.makeChunk(chunk);
@@ -25,6 +27,10 @@ void BlockRenderer::generateMeshes() {
 	}
 }
 
-void BlockRenderer::renderAll(Camera* camera) {
-	for(Chunk* chunk : world->iterable) chunk->chunk_draw.draw(camera);
+void BlockRenderer::render() {
+	for(Chunk* chunk : world->iterable) {
+		if(frustum->boxInFrustum(chunk->min, chunk->max)) {
+			chunk->chunk_draw.draw(camera);
+		}
+	}
 }

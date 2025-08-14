@@ -163,28 +163,3 @@ Chunk* Chunks::getChunk(int32_t x, int32_t y, int32_t z) {
 		return nullptr;
 	return chunk_map[hash_xyz(x, y, z)].get();
 }
-
-//void Chunks::set(int x, int y, int z, int id) {
-//	int cx = x / ChunkInfo::WIDTH;
-//	int cy = y / ChunkInfo::HEIGHT;
-//	int cz = z / ChunkInfo::DEPTH;
-//	if (x < 0) cx--;
-//	if (y < 0) cy--;
-//	if (z < 0) cz--;
-//	if (cx < 0 || cy < 0 || cz < 0 || cx >= w || cy >= h || cz >= d)
-//		return;
-//	Chunk* chunk = chunks[(cy * d + cz) * w + cx];
-//	int lx = x - cx * ChunkInfo::WIDTH;
-//	int ly = y - cy * ChunkInfo::HEIGHT;
-//	int lz = z - cz * ChunkInfo::DEPTH;
-//	chunk->blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;
-//	// chunk->modified = true;
-//
-//	if (lx == 0 && (chunk = getChunk(cx - 1, cy, cz))) chunk->modified = true;
-//	if (ly == 0 && (chunk = getChunk(cx, cy - 1, cz))) chunk->modified = true;
-//	if (lz == 0 && (chunk = getChunk(cx, cy, cz - 1))) chunk->modified = true;
-//
-//	if (lx == ChunkInfo::WIDTH - 1 && (chunk = getChunk(cx + 1, cy, cz))) chunk->modified = true;
-//	if (ly == ChunkInfo::HEIGHT - 1 && (chunk = getChunk(cx, cy + 1, cz))) chunk->modified = true;
-//	if (lz == ChunkInfo::DEPTH - 1 && (chunk = getChunk(cx, cy, cz + 1))) chunk->modified = true;
-//}

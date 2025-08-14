@@ -6,6 +6,7 @@
 
 #include "../noise/PerlinNoise.hpp"
 #include "../lighting/LightMap.hpp"
+#include "ChunkInfo.hpp"
 
 #include <glm/ext.hpp>
 #include <cmath>
@@ -13,6 +14,8 @@
 Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 	lightmap(new Lightmap),
 	blocks(std::make_unique<block[]>(ChunkInfo::ChunkInfo::VOLUME)),
+	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
+	max(x*ChunkInfo::WIDTH+ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH+ChunkInfo::DEPTH),
 	x(x), y(y), z(z) {
 	const float scale = 0.02f;
 	const float scale2 = 0.02f;

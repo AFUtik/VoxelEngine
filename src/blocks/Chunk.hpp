@@ -28,7 +28,9 @@ const int OFFSETS[26][3] = {
 class Chunks;
 
 class Chunk {
+	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
 	Chunk* neighbors[26];
+	
 	std::unique_ptr<block[]> blocks;
 	std::unique_ptr<Lightmap> lightmap;
 
@@ -41,6 +43,8 @@ public:
 
 	// World Pos //
 	int32_t x, y, z;
+	glm::vec3 min;
+	glm::vec3 max;
 
 	Chunk(int x, int y, int z) : x(x), y(y), z(z) {}
 

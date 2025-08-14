@@ -5,15 +5,18 @@
 
 #include "glm/ext/vector_double3.hpp"
 #include "graphics/Camera.hpp"
+#include "graphics/Frustum.hpp"
 #include "graphics/model/Mesh.hpp"
 #include "graphics/model/Texture.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/renderer/BlockRenderer.hpp"
+#include "graphics/renderer/DrawContext.hpp"
 
 #include "blocks/Block.hpp"
 #include "blocks/Chunk.hpp"
 #include "blocks/Chunks.hpp"
 
+#include "graphics/renderer/DrawContext.hpp"
 #include "lighting/LightMap.hpp"
 #include "lighting/LightSolver.hpp"
 
@@ -58,8 +61,8 @@ int main()
 
 	std::cout << 1 << '\n';
 
-	Chunks* world = new Chunks(5, 1, 5, true);
-	BlockRenderer renderer(world, shader);
+	Chunks* world = new Chunks(25, 1, 25, true);
+	
 
 	std::cout << 2 << '\n';
 
@@ -82,7 +85,7 @@ int main()
 
 	start = std::chrono::high_resolution_clock::now();
 
-	renderer.generateMeshes();
+	
 
 	auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -97,8 +100,8 @@ int main()
 	//ImGui_ImplOpenGL3_Init("#version 330");
 
 	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
-	camera->translate(camera->xdir());
-	
+
+	Frustum* frustum = new Frustum;
 
 	float camX = 0.0f;
 	float camY = 0.0f;
@@ -111,6 +114,9 @@ int main()
 
 	double timeAccu = 0.0f;
 
+	DrawContext drawContext;
+
+	drawContext.registerRenderer("world_renderer", new BlockRenderer(world));
 
 	Events::toggle_cursor();
 	while (!Window::isShouldClose()) {
@@ -177,11 +183,15 @@ int main()
 			//ImGui::NewFrame();
 			
 			shader->use();
+
+			glm::mat4 projview = camera->getProjection() * camera->getView();
 			
-			shader->uniformMatrix("projview", camera->getProjection() * camera->getView());
+			shader->uniformMatrix("projview", projview);
 			texture->bind();
 
-			renderer.renderAll(camera);
+			frustum->update(projview);
+
+			drawContext.render();
 
 			//ImGui::ShowDemoWindow();
 
@@ -203,12 +213,14 @@ int main()
 
 	delete texture;
 	delete shader;
+	delete frustum;
 
 	// delete solverR;
 	// delete solverG;
 	// delete solverB;
 	// delete solverS;
 
+	delete camera;
 	delete world;
 
 	Window::terminate();

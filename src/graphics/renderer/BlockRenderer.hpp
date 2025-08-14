@@ -6,19 +6,19 @@ class Mesh;
 class Chunk;
 class Chunks;
 class Shader;
+class Frustum;
 
 #include "ChunkMesher.hpp"
+#include "Renderer.hpp"
 
-class BlockRenderer {
+class BlockRenderer : public Renderer {
 	ChunkMesher mesher;
-	Chunks *world;
-
-	Shader* shader;
+	Chunks* world;
 public:
-	BlockRenderer(Chunks* world, Shader* shader) :  world(world), shader(shader)  {};
+	BlockRenderer(Chunks* chunks) : world(chunks) {}
 
 	void generateMeshes();
-	void renderAll(Camera* camera);
+	void render() override;
 };
 
 #endif // !BLOCKRENDERER_HPP

@@ -8,6 +8,8 @@
 #include <cstdint>
 
 struct ChunkInfo {
+    int x, y, z;
+
     static inline uint32_t WIDTH  = 16;
     static inline uint32_t HEIGHT = 256;
     static inline uint32_t DEPTH  = 16;

@@ -18,7 +18,7 @@ struct LightEntry {
 	Chunk *chunk = nullptr;
 };
 
-constexpr int MAX_LIGHT_UPDATES = 1 << 20; // 65536
+constexpr int MAX_LIGHT_UPDATES = 1 << 20;
 
 class LightSolver {
 	RingBuffer<LightEntry, MAX_LIGHT_UPDATES> addqueue;
