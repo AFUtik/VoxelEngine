@@ -111,6 +111,32 @@ Chunks::Chunks(int w, int h, int d, bool lighting)  {
 	std::cout << "raw: " << raw_total_bytes/(1024*1024) << " mb " << "rle: "  << rle_total_bytes/(1024*1024) << " mb" << std::endl;
 }
 
+void Chunks::loadNeighbours(Chunk* chunk) {
+	for (int i = 0; i < 26; i++) {
+		int nx = chunk->x + OFFSETS[i][0];
+		// int ny = chunk->y + OFFSETS[i][1];
+		
+		int nz = chunk->z + OFFSETS[i][2];
+		auto it = chunkMap.find(compress_xz(nx, nz));
+		
+		if (it != chunkMap.end()) {
+			Chunk* neighbour = it->second.get();
+			chunk->neighbors[i] = neighbour;
+			neighbour->neighbors[25-i] = chunk;
+		} else {
+			chunk->neighbors[i] = nullptr;
+		}
+	}
+}
+
+void Chunks::loadChunks(const glm::dvec3& position) {
+	
+}
+
+void Chunks::unloadChunks(const glm::dvec3& position) {
+
+}
+
 
 block Chunks::getBlock(int x, int y, int z) {
 	int cx = x / ChunkInfo::WIDTH;
@@ -121,7 +147,7 @@ block Chunks::getBlock(int x, int y, int z) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return block{0};
-	Chunk* chunk = findChunkByCoordsSafe(cx, cy, cz);
+	Chunk* chunk = findChunkByCoordsSafe(cx, cz);
 	if (!chunk) return block{0};
 	int lx = x - cx * ChunkInfo::WIDTH;
 	int ly = y - cy * ChunkInfo::HEIGHT;
@@ -138,7 +164,7 @@ unsigned char Chunks::getLight(int x, int y, int z, int channel) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return 0;
-	Chunk* chunk = findChunkByCoordsSafe(cx, cy, cz);
+	Chunk* chunk = findChunkByCoordsSafe(cx, cz);
 	if (chunk == nullptr) return 0;
 	int lx = x - cx * ChunkInfo::WIDTH;
 	int ly = y - cy * ChunkInfo::HEIGHT;
@@ -155,11 +181,17 @@ Chunk* Chunks::getChunkByBlock(int x, int y, int z) {
 	if (z < 0) cz--;
 	if (cx < 0 || cy < 0 || cz < 0)
 		return nullptr;
-	return findChunkByCoordsSafe(cx, cy, cz);
+	return findChunkByCoordsSafe(cx, cz);
 }
 
-Chunk* Chunks::getChunk(int32_t x, int32_t y, int32_t z) {
-	if (x < 0 || y < 0 || z < 0)
+Chunk* Chunks::getChunk(int32_t x, int32_t z) {
+	if (x < 0 ||  z < 0)
 		return nullptr;
-	return chunk_map[hash_xyz(x, y, z)].get();
+	return chunkMap[compress_xz(x, z)].get();
 }
+
+void Chunks::update(const glm::dvec3 &position) {
+	loadChunks(position);
+	unloadChunks(position);
+}
+

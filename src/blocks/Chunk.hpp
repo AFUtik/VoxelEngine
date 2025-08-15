@@ -37,6 +37,8 @@ class Chunk {
 	friend class Chunks;
 	friend class ChunkRLE;
 
+	bool modified;
+
 	Chunks* world;
 public:
 	DrawableObject chunk_draw;
