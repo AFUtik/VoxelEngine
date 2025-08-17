@@ -17,6 +17,7 @@
 #include "blocks/Chunks.hpp"
 
 #include "graphics/renderer/DrawContext.hpp"
+#include "graphics/renderer/Renderer.hpp"
 #include "lighting/LightMap.hpp"
 #include "lighting/LightSolver.hpp"
 
@@ -61,7 +62,7 @@ int main()
 
 	std::cout << 1 << '\n';
 
-	Chunks* world = new Chunks(25, 1, 25, true);
+	Chunks* world = new Chunks(5, 1, 5, true);
 	
 
 	std::cout << 2 << '\n';
@@ -76,22 +77,11 @@ int main()
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	auto start = std::chrono::high_resolution_clock::now();
-
+	
 	std::cout << 5 << '\n';
 
 	std::cout << 6 << '\n';
-
-	start = std::chrono::high_resolution_clock::now();
-
 	
-
-	auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-	std::cout << "Render Time: " << duration.count() << " ms \n";
-
 	//IMGUI_CHECKVERSION();
 	//ImGui::CreateContext();
 	//ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -100,7 +90,7 @@ int main()
 	//ImGui_ImplOpenGL3_Init("#version 330");
 
 	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
-
+	
 	Frustum* frustum = new Frustum;
 
 	float camX = 0.0f;
@@ -114,7 +104,7 @@ int main()
 
 	double timeAccu = 0.0f;
 
-	DrawContext drawContext;
+	DrawContext drawContext(new Renderer(camera, shader, frustum));
 
 	drawContext.registerRenderer("world_renderer", new BlockRenderer(world));
 
@@ -188,9 +178,11 @@ int main()
 			
 			shader->uniformMatrix("projview", projview);
 			texture->bind();
+			
 
+			world->update(camera->getPosition());
 			frustum->update(projview);
-
+			
 			drawContext.render();
 
 			//ImGui::ShowDemoWindow();

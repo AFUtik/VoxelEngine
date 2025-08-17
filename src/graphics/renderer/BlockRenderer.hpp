@@ -17,7 +17,6 @@ class BlockRenderer : public Renderer {
 public:
 	BlockRenderer(Chunks* chunks) : world(chunks) {}
 
-	void generateMeshes();
 	void render() override;
 };
 

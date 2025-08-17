@@ -19,15 +19,16 @@ class Camera;
 class DrawableObject {
 protected:
     std::unique_ptr<Mesh> mesh;
-    
+
     Transform transform;
     Shader* shader = nullptr;
 public:
-    DrawableObject() : mesh(new Mesh) {}
-
+    DrawableObject() : mesh(nullptr) {}
+    
     inline Mesh* getMesh() {return mesh.get();}
     inline Transform& getTransform() {return transform;}
-    
+
+    inline void loadMesh(Mesh* mesh) {this->mesh.reset(mesh);}
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {

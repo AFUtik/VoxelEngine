@@ -270,7 +270,7 @@ public:
         float v1 = 1 - ((1 + id / 16) * uvsize);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
-
+        
         if (!cur_chunk->getBoundBlock(lx, ly+1, lz).id) makeFace<direction::UP>(consumer, lx, ly, lz, u1, v1, u2, v2);  // UP
         if (!cur_chunk->getBoundBlock(lx, ly-1, lz).id) makeFace<direction::DOWN>(consumer,  lx, ly, lz, u1, v1, u2, v2); // DOWN
         if (!cur_chunk->getBoundBlock(lx+1, ly, lz).id) makeFace<direction::EAST>(consumer, lx, ly, lz, u1, v1, u2, v2); // EAST
@@ -281,8 +281,9 @@ public:
 
     inline void makeChunk(Chunk* chunk) {
         cur_chunk = chunk;
+        Mesh* mesh = new Mesh;
+        VertexConsumer consumer = mesh->getConsumer();
 
-        VertexConsumer consumer = chunk->chunk_draw.getMesh()->getConsumer();
         for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
             for (int z = 0; z < ChunkInfo::DEPTH; z++) {
                 for (int x = 0; x < ChunkInfo::WIDTH; x++) {
@@ -290,11 +291,11 @@ public:
                     unsigned int id = vox.id;
 
                     if (!id) continue;
-
                     makeCube(consumer, x, y, z, vox.id);
                 }
             }
         }
+        chunk->chunk_draw.loadMesh(mesh);
     }
 
     inline void modifyCube() {}

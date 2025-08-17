@@ -17,50 +17,33 @@ class Frustum {
 public:
     Plane planes[6]; // left, right, top, bottom, near, far
 
-    // вычисление плоскостей по viewProjection матрице
-    void update(const glm::mat4& vp) {
-        // Left
-        planes[0].normal.x = vp[0][3] + vp[0][0];
-        planes[0].normal.y = vp[1][3] + vp[1][0];
-        planes[0].normal.z = vp[2][3] + vp[2][0];
-        planes[0].d        = vp[3][3] + vp[3][0];
+    void update(const glm::mat4& m) {
+        glm::vec4 row0 = glm::vec4(m[0][0], m[1][0], m[2][0], m[3][0]);
+        glm::vec4 row1 = glm::vec4(m[0][1], m[1][1], m[2][1], m[3][1]);
+        glm::vec4 row2 = glm::vec4(m[0][2], m[1][2], m[2][2], m[3][2]);
+        glm::vec4 row3 = glm::vec4(m[0][3], m[1][3], m[2][3], m[3][3]);
 
-        // Right
-        planes[1].normal.x = vp[0][3] - vp[0][0];
-        planes[1].normal.y = vp[1][3] - vp[1][0];
-        planes[1].normal.z = vp[2][3] - vp[2][0];
-        planes[1].d        = vp[3][3] - vp[3][0];
+        glm::vec4 left   = row3 + row0;
+        glm::vec4 right  = row3 - row0;
+        glm::vec4 bottom = row3 + row1;
+        glm::vec4 top    = row3 - row1;
+        glm::vec4 near   = row3 + row2;
+        glm::vec4 far    = row3 - row2;
 
-        // Bottom
-        planes[2].normal.x = vp[0][3] + vp[0][1];
-        planes[2].normal.y = vp[1][3] + vp[1][1];
-        planes[2].normal.z = vp[2][3] + vp[2][1];
-        planes[2].d        = vp[3][3] + vp[3][1];
-
-        // Top
-        planes[3].normal.x = vp[0][3] - vp[0][1];
-        planes[3].normal.y = vp[1][3] - vp[1][1];
-        planes[3].normal.z = vp[2][3] - vp[2][1];
-        planes[3].d        = vp[3][3] - vp[3][1];
-
-        // Near
-        planes[4].normal.x = vp[0][3] + vp[0][2];
-        planes[4].normal.y = vp[1][3] + vp[1][2];
-        planes[4].normal.z = vp[2][3] + vp[2][2];
-        planes[4].d        = vp[3][3] + vp[3][2];
-
-        // Far
-        planes[5].normal.x = vp[0][3] - vp[0][2];
-        planes[5].normal.y = vp[1][3] - vp[1][2];
-        planes[5].normal.z = vp[2][3] - vp[2][2];
-        planes[5].d        = vp[3][3] - vp[3][2];
-        
-        // нормализация плоскостей
-        for (int i = 0; i < 6; i++) {
+        auto setPlane = [&](int i, const glm::vec4& p) {
+            planes[i].normal = glm::vec3(p.x, p.y, p.z);
+            planes[i].d = p.w;
             float len = glm::length(planes[i].normal);
             planes[i].normal /= len;
             planes[i].d /= len;
-        }
+        };
+
+        setPlane(0, left);
+        setPlane(1, right);
+        setPlane(2, bottom);
+        setPlane(3, top);
+        setPlane(4, near);
+        setPlane(5, far);
     }
 
     // Проверка точки
@@ -78,7 +61,7 @@ public:
             if (planes[i].normal.x >= 0) p.x = max.x;
             if (planes[i].normal.y >= 0) p.y = max.y;
             if (planes[i].normal.z >= 0) p.z = max.z;
-            if (planes[i].distance(p) < 0) return false;
+            if (planes[i].distance(p) < -1e-4f) return false;
         }
         return true;
     }

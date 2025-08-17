@@ -10,27 +10,27 @@
 #include "BlockRenderer.hpp"
 
 #include <glm/ext.hpp>
+#include <memory>
 
 #include "../../lighting/LightMap.hpp"
 #include "../../graphics/Transform.hpp"
 #include "../../blocks/ChunkInfo.hpp"
 
 #include "../Frustum.hpp"
-
-void BlockRenderer::generateMeshes() {
-	for(Chunk* chunk : world->iterable) {
-		mesher.makeChunk(chunk);
-
-		chunk->chunk_draw.loadShader(shader);
-		chunk->chunk_draw.getMesh()->upload_buffers();
-		chunk->chunk_draw.getTransform().setPosition(glm::dvec3(chunk->x * ChunkInfo::WIDTH + 0.5, chunk->y * ChunkInfo::HEIGHT + 0.5f, chunk->z * ChunkInfo::DEPTH + 0.5f));
-	}
-}
+#include "../../graphics/Camera.hpp"
 
 void BlockRenderer::render() {
-	for(Chunk* chunk : world->iterable) {
-		if(frustum->boxInFrustum(chunk->min, chunk->max)) {
-			chunk->chunk_draw.draw(camera);
+	for(const auto& [chunkPos, chunk] : world->chunkMap) {
+		if (!chunk->chunk_draw.getMesh()) {
+			mesher.makeChunk(chunk.get());
+			
+			chunk->chunk_draw.loadShader(shader);
+			chunk->chunk_draw.getMesh()->upload_buffers();
+			chunk->chunk_draw.getTransform().setPosition(glm::dvec3(chunk->x * ChunkInfo::WIDTH + 0.5, chunk->y * ChunkInfo::HEIGHT + 0.5f, chunk->z * ChunkInfo::DEPTH + 0.5f));
 		}
+
+		// if(frustum->boxInFrustum(chunk->min, chunk->max)) {
+			chunk->chunk_draw.draw(camera);
+		// }
 	}
 }

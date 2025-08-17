@@ -18,12 +18,15 @@ protected:
 
     Camera* camera = nullptr; 
     Shader* shader = nullptr;
-
     Frustum* frustum = nullptr;
 
     friend class DrawContext;
 public:
-    virtual void render() = 0;
+    Renderer(Camera* camera, Shader* shader, Frustum* frustum) : camera(camera), shader(shader), frustum(frustum) {}
+    
+    Renderer() = default;
+
+    virtual void render() {};
 };
 
 #endif //RENDitERER_HPP
