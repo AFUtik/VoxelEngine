@@ -63,7 +63,6 @@ int main()
 	std::cout << 1 << '\n';
 
 	Chunks* world = new Chunks(5, 1, 5, true);
-	
 
 	std::cout << 2 << '\n';
 
@@ -179,8 +178,8 @@ int main()
 			shader->uniformMatrix("projview", projview);
 			texture->bind();
 			
-
 			world->update(camera->getPosition());
+
 			frustum->update(projview);
 			
 			drawContext.render();

@@ -104,7 +104,7 @@ void LightSolver::solve() {
 				block v = chunk->getBlock(lx, ly, lz);
 				if (v.id == 0 && light + 2 <= entry.light) {;
 					chunk->setLight(lx, ly, lz, channel, entry.light - 1);
-					// chunk->modified = true;
+					chunk->modify();
 					LightEntry nentry;
 					nentry.lx = lx;
 					nentry.ly = ly;

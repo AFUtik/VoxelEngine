@@ -21,12 +21,20 @@
 
 void BlockRenderer::render() {
 	for(const auto& [chunkPos, chunk] : world->chunkMap) {
-		if (!chunk->chunk_draw.getMesh()) {
+		if (!chunk->chunk_draw.getMesh() || chunk->isModified()) {
+
 			mesher.makeChunk(chunk.get());
 			
 			chunk->chunk_draw.loadShader(shader);
 			chunk->chunk_draw.getMesh()->upload_buffers();
-			chunk->chunk_draw.getTransform().setPosition(glm::dvec3(chunk->x * ChunkInfo::WIDTH + 0.5, chunk->y * ChunkInfo::HEIGHT + 0.5f, chunk->z * ChunkInfo::DEPTH + 0.5f));
+
+			double px = static_cast<double>(chunk->x) * static_cast<double>(ChunkInfo::WIDTH)  + 0.5;
+			double py = static_cast<double>(chunk->y) * static_cast<double>(ChunkInfo::HEIGHT) + 0.5;
+			double pz = static_cast<double>(chunk->z) * static_cast<double>(ChunkInfo::DEPTH)  + 0.5;
+
+			chunk->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz));
+
+			chunk->unmodify();
 		}
 
 		// if(frustum->boxInFrustum(chunk->min, chunk->max)) {

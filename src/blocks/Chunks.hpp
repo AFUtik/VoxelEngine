@@ -7,6 +7,7 @@
 #include <map>
 #include <unordered_map>
 
+#include <array>
 #include <memory>
 
 #include <glm/glm.hpp>
@@ -56,25 +57,37 @@ class Chunks {
 	 */
 	// std::unordered_map<uint64_t, std::unique_ptr<ChunkRLE>> rleChunkMap;
 
-	ivec2 lastPlayerChunk = ivec2(0.0);
+	ivec3 lastPlayerChunk = ivec3(0.0);
 
 	LightSolver* solverR = nullptr;
 	LightSolver* solverG = nullptr;
 	LightSolver* solverB = nullptr;
 	LightSolver* solverS = nullptr;
 
-	inline Chunk* findChunkByCoordsSafe(int cx, int cy, int cz) {
-		auto it = chunkMap.find(ChunkPos{cx, cy, cz});
-		return it != chunkMap.end() ? it->second.get() : nullptr;
+	LightSolver* Chunks::getSolver(int chan) {
+		switch(chan) {
+			case 0: return solverR;
+			case 1: return solverG;
+			default: return solverB;
+		}
 	}
 
-	inline ivec3 worldToChunk(const dvec3 &worldPos) {
-		return ivec3(worldPos.x/ChunkInfo::WIDTH, worldPos.y/ChunkInfo::HEIGHT, worldPos.y/ChunkInfo::DEPTH);
-	}
-
+	// Neighbour methods //
 	void loadNeighbours(Chunk* chunk);
+	
+	void processBoundaryBlock(
+		Chunk* A, Chunk* B, 
+		int ax, int ay, int az, 
+		int bx, int by, int bz, 
+		std::array<bool, 4> &addedAny);
 
+	void syncBoundaryWithNeigbour(
+		Chunk* chunk, Chunk* neighbor, 
+		int dir, std::array<bool, 4> &addedAny);
+
+	void calculateLight(Chunk* chunk);
 	Chunk* generateChunk(int x, int y, int z);
+
 	void unloadChunk(int x, int y, int z);
 	void loadChunk  (int x, int y, int z);
 
