@@ -121,7 +121,7 @@ void Chunks::loadNeighbours(Chunk* chunk) {
             chunk->neighbors[i] = neighbour;
 
             // найдем индекс противоположного смещения (или заранее подготовь opposite[i])
-            int opp = 25-i;
+            int opp = oppositeIdx[i];
             if (opp >= 0) neighbour->neighbors[opp] = chunk;
         } else {
             chunk->neighbors[i] = nullptr;
@@ -130,42 +130,35 @@ void Chunks::loadNeighbours(Chunk* chunk) {
 }
 
 void Chunks::processBoundaryBlock(
-	Chunk* A, Chunk* B, 
-	int ax, int ay, int az, 
-	int bx, int by, int bz, 
-	std::array<bool, 4> &addedAny) 
+    Chunk* A, Chunk* B,
+    int ax, int ay, int az,
+    int bx, int by, int bz,
+    std::array<bool, 4> &addedAny)
 {
-	block aBlock = A->getBlock(ax, ay, az);
+    block aBlock = A->getBlock(ax, ay, az);
     block bBlock = B->getBlock(bx, by, bz);
-    if (aBlock.id != 0 || bBlock.id != 0) return;
 
-    // 2) сравнить уровни по каждому каналу (0..2) и skylight (3)
+    // Если один из блоков непрозрачный для света (solid) — не передаём свет между ними
+    if (aBlock.id != 0 && aBlock.id != 0) return;
+
     for (int chan = 0; chan <= 3; ++chan) {
-        unsigned char L_a = A->getBoundLight(ax, ay, az, chan); // или A->lightmap->get(...)
+        unsigned char L_a = A->getBoundLight(ax, ay, az, chan);
         unsigned char L_b = B->getBoundLight(bx, by, bz, chan);
 
         if (L_b > L_a) {
-            // источник света в соседнем чанке B "сильнее" — нужно запустить распространение в A
-            // используем твою функцию addLocally (предполагаем сигнатуру)
             if (chan < 3) {
-                // для RGB: addLocally(x,y,z, init_value, chunk)
-                // предполагаем init_value 0 означает "использовать текущее" — если у тебя другая сигнатура,
-                // передай L_b или L_b-1 в соответствии с реализацией
-                // Я добавлю вариант, где есть addLocally(x,y,z, initialIntensity, chunk)
-                getSolver(chan)->addLocally(ax, ay, az, (int)L_b, A);
-                addedAny[chan] = true;
-            } else {
-                // skylight solver (S)
-                solverS->addLocally(ax, ay, az, A);
-                addedAny[3] = true;
-            }
-        } else if (L_a > L_b) {
-            // наоборот — источник на А сильнее, нужно обновить B (добавить источник в B)
-            if (chan < 3) {
-                getSolver(chan)->addLocally(bx, by, bz, (int)L_a, B);
+                getSolver(chan)->addLocally(ax, ay, az, static_cast<int>(L_b), A);
                 addedAny[chan] = true;
             } else {
                 solverS->addLocally(bx, by, bz, B);
+                addedAny[3] = true;
+            }
+        } else if (L_a > L_b) {
+            if (chan < 3) {
+                getSolver(chan)->addLocally(bx, by, bz, static_cast<int>(L_a), B);
+                addedAny[chan] = true;
+            } else {
+                solverS->addLocally(ax, ay, bz, B);
                 addedAny[3] = true;
             }
         }
@@ -173,10 +166,10 @@ void Chunks::processBoundaryBlock(
 }
 
 void Chunks::syncBoundaryWithNeigbour(
-		Chunk* chunk, Chunk* neighbor, 
-		int dir, std::array<bool, 4> &addedAny) 
+    Chunk* chunk, Chunk* neighbor,
+    int dir, std::array<bool, 4> &addedAny)
 {
-	const int W = ChunkInfo::WIDTH;
+    const int W = ChunkInfo::WIDTH;
     const int H = ChunkInfo::HEIGHT;
     const int D = ChunkInfo::DEPTH;
 
@@ -184,35 +177,26 @@ void Chunks::syncBoundaryWithNeigbour(
     int dy = FACE_DIRS[dir][1];
     int dz = FACE_DIRS[dir][2];
 
-    // выберем плоскость и соответствующие локальные координаты
-    if (dx != 0) { // +/- X: iterate y,z; x_local = (dx>0 ? W-1 : 0), neighbor local x = (dx>0 ? 0 : W-1)
-        int x_local = (dx > 0) ? (W - 1) : 0;
-        int nx_local = (dx > 0) ? 0 : (W - 1);
-        for (int y = 0; y < H; ++y) {
-            for (int z = 0; z < D; ++z) {
-                processBoundaryBlock(chunk, neighbor, x_local, y, z, nx_local, y, z, addedAny);
-            }
-        }
-    } else if (dy != 0) { // +/- Y: iterate x,z
-        int y_local = (dy > 0) ? (H - 1) : 0;
-        int ny_local = (dy > 0) ? 0 : (H - 1);
-        for (int x = 0; x < W; ++x) {
-            for (int z = 0; z < D; ++z) {
-                processBoundaryBlock(chunk, neighbor, x, y_local, z, x, ny_local, z, addedAny);
-            }
-        }
-    } else { // +/- Z: iterate x,y
-        int z_local = (dz > 0) ? (D - 1) : 0;
-        int nz_local = (dz > 0) ? 0 : (D - 1);
-        for (int x = 0; x < W; ++x) {
-            for (int y = 0; y < H; ++y) {
-                processBoundaryBlock(chunk, neighbor, x, y, z_local, x, y, nz_local, addedAny);
-            }
-        }
+    if (dx != 0) {
+        int ax = (dx > 0) ? (W - 1) : 0;
+        int bx = (dx > 0) ? 0 : (W - 1);
+        for (int y = 0; y < H; ++y) for (int z = 0; z < D; ++z)
+            processBoundaryBlock(chunk, neighbor, ax, y, z, bx, y, z, addedAny);
+    } else if (dy != 0) {
+        int ay = (dy > 0) ? (H - 1) : 0;
+        int by = (dy > 0) ? 0 : (H - 1);
+        for (int x = 0; x < W; ++x) for (int z = 0; z < D; ++z)
+            processBoundaryBlock(chunk, neighbor, x, ay, z, x, by, z, addedAny);
+    } else {
+        int az = (dz > 0) ? (D - 1) : 0;
+        int bz = (dz > 0) ? 0 : (D - 1);
+        for (int x = 0; x < W; ++x) for (int y = 0; y < H; ++y)
+            processBoundaryBlock(chunk, neighbor, x, y, az, x, y, bz, addedAny);
     }
 }
 
 void Chunks::calculateLight(Chunk* chunk) {
+	/*
 	for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
 		for (int z = 0; z < ChunkInfo::DEPTH; z++) {
 			for (int x = 0; x < ChunkInfo::WIDTH; x++) {
@@ -224,7 +208,7 @@ void Chunks::calculateLight(Chunk* chunk) {
 				}
 			}
 		}
-	}
+	}*/
 
 	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
 		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
@@ -259,6 +243,7 @@ void Chunks::calculateLight(Chunk* chunk) {
 	}
 }
 
+
 Chunk* Chunks::generateChunk(int cx, int cy, int cz) {
 	auto [it, inserted] = chunkMap.emplace(
 					ChunkPos{cx,cy,cz}, 
@@ -270,19 +255,19 @@ Chunk* Chunks::generateChunk(int cx, int cy, int cz) {
 	calculateLight(chunk);
 
     std::array<bool,4> addedAnyGlobal = { false, false, false, false };
-
-	for(int i = 0; i < 26; i++) {
-		Chunk* neigh = chunk->neighbors[i];
-		if(neigh) {
-			for(int j = 0; j < 6; j++) syncBoundaryWithNeigbour(chunk, neigh, j, addedAnyGlobal);
-			neigh->modify();
-		}
+	
+    for (int face = 0; face < 6; ++face) {
+		int idx = faceToIdx(face); // face -> индекс в OFFSETS/neighbors
+		if (idx < 0) continue;
+		Chunk* neigh = chunk->neighbors[idx];
+		if (!neigh) continue;
+		syncBoundaryWithNeigbour(chunk, neigh, face, addedAnyGlobal);
+		neigh->modify();
 	}
-
-	if (addedAnyGlobal[0] && solverR) solverR->solve();
-    if (addedAnyGlobal[1] && solverG) solverG->solve();
-    if (addedAnyGlobal[2] && solverB) solverB->solve();
-    if (addedAnyGlobal[3] && solverS) solverS->solve();
+    solverR->solve();
+    solverG->solve();
+    solverB->solve();
+    solverS->solve();
 
 	return chunk;
 }

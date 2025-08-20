@@ -25,6 +25,9 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 			// Global position //
 			const int gx = _x + this->x * ChunkInfo::WIDTH;
 			const int gz = _z + this->z * ChunkInfo::DEPTH;
+			
+			
+
 			int y = height * generator.noise(
 				static_cast<float>(gx)*scale,
 				static_cast<float>(gz)*scale);
@@ -37,6 +40,11 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 				);
 				int id = 1;
 				if (n < 0.0005) id = 0;
+				
+				if(id != 0 && (_x == ChunkInfo::WIDTH-1 || _z == ChunkInfo::DEPTH-1)) {
+					setBlock(_x, _y, _z, 2);
+					continue;
+				};
 
 				setBlock(_x, _y, _z, id);
 			}

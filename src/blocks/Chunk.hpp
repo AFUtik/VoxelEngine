@@ -52,12 +52,55 @@ static std::array<int, 27> buildNeiIndexByEncode() {
 
 static const std::array<int,27> NEI_INDEX_BY_ENCODE = buildNeiIndexByEncode();
 
+static std::array<int,26> makeOpposites() {
+        std::array<int,26> arr{};
+        for (int i = 0; i < 26; ++i) {
+            arr[i] = -1;
+            for (int j = 0; j < 26; ++j) {
+                if (OFFSETS[j][0] == -OFFSETS[i][0] &&
+                    OFFSETS[j][1] == -OFFSETS[i][1] &&
+                    OFFSETS[j][2] == -OFFSETS[i][2]) {
+                    arr[i] = j;
+                    break;
+                }
+            }
+            assert(arr[i] != -1 && "No opposite offset found!");
+        }
+        return arr;
+    }
+
+static inline std::array<int,26> oppositeIdx = makeOpposites();
+
 static constexpr inline int floorDiv(int a, int b) {
 	if (b < 0) b = -b;
 	int q = a / b;
 	int r = a % b;
 	if (r != 0 && ((r < 0) != (b < 0))) --q;
 	return q;
+}
+
+static inline int dirFromDelta(int dx, int dy, int dz) {
+    for (int d = 0; d < 6; ++d) {
+        if (FACE_DIRS[d][0] == dx && FACE_DIRS[d][1] == dy && FACE_DIRS[d][2] == dz) return d;
+    }
+    return -1;
+}
+
+
+static inline int faceToIdx(int face) {
+    assert(face >= 0 && face < 6);
+    int dx = FACE_DIRS[face][0];
+    int dy = FACE_DIRS[face][1];
+    int dz = FACE_DIRS[face][2];
+
+    for (int i = 0; i < 26; ++i) {
+        if (OFFSETS[i][0] == dx &&
+            OFFSETS[i][1] == dy &&
+            OFFSETS[i][2] == dz) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 class Chunks;
