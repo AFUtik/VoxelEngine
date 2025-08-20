@@ -5,6 +5,7 @@
 #include "iostream"
 
 #include "../lighting/LightMap.hpp"
+#include "structures/ThreadPool.hpp"
 
 #include <glm/glm.hpp>
 
@@ -20,7 +21,7 @@ glm::ivec3 worldToChunk3(glm::dvec3 pos) {
              floorDiv(pos.z, ChunkInfo::DEPTH) };
 }
 
-Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0)  {
+Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), threadPool(4)  {
 	PerlinNoise noise(0);
 	noise.octaves = 2;
 
@@ -250,54 +251,51 @@ Chunk* Chunks::generateChunk(int cx, int cy, int cz) {
 					std::make_unique<Chunk>(cx,cy,cz,noise)
 				);
 	Chunk* chunk = it->second.get();
-    
-	loadNeighbours(chunk);
-	calculateLight(chunk);
 
-    std::array<bool,4> addedAnyGlobal = { false, false, false, false };
-	
-    for (int face = 0; face < 6; ++face) {
-		int idx = faceToIdx(face); // face -> индекс в OFFSETS/neighbors
-		if (idx < 0) continue;
-		Chunk* neigh = chunk->neighbors[idx];
-		if (!neigh) continue;
-		syncBoundaryWithNeigbour(chunk, neigh, face, addedAnyGlobal);
-		neigh->modify();
-	}
-    solverR->solve();
-    solverG->solve();
-    solverB->solve();
-    solverS->solve();
 
 	return chunk;
 }
 
 void Chunks::loadChunk(int x, int y, int z) {
-	Chunk* chunk = getChunk(x, y, z);
-    if (chunk != nullptr) return;
+	ChunkPos pos{x, y, z};
 
-	chunk = generateChunk(x, y, z);
+	{ // сначала проверим, нет ли уже чанка
+        std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
+        if (chunkMap.find(pos) != chunkMap.end()) return; // уже загружен
+    }
+
+    // Запланировать задачу генерации в пул потоков
+    auto fut = threadPool.submit([this, pos]() {
+        // generateChunk делает только локальную работу — не трогает chunkMap
+        auto chunk_ptr = std::make_unique<Chunk>(pos.x, pos.y, pos.z, noise);
+
+        // Поместим готовый чанк в очередь для интеграции в главный поток
+        {
+            std::lock_guard<std::mutex> lk(this->readyQueueMutex);
+            this->readyChunks.push(std::move(chunk_ptr));
+        }
+        this->readyCv.notify_one();
+    });
+
+    // (опционально) сохранить future, чтобы отслеживать или дождаться позже
+    generationFutures.emplace_back(std::move(fut));
 }
 
 void Chunks::unloadChunk(int x, int y, int z) {
-	auto it = chunkMap.find(ChunkPos{x,y,z});
+	ChunkPos key{x,y,z};
+    std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+    auto it = chunkMap.find(key);
     if (it == chunkMap.end()) return;
-    Chunk* chunk = it->second.get();
-
-    // очистить у соседей обратные ссылки
+    // Если нужен безопасный отцеп от iterable — удалить там тоже
+    Chunk* ptr = it->second.get();
     for (int i = 0; i < 26; ++i) {
-        Chunk* n = chunk->neighbors[i];
+        Chunk* n = ptr->neighbors[i];
         if (!n) continue;
         int opp = 25 - i;
-        if (opp >= 0 && n->neighbors[opp] == chunk) {
+        if (opp >= 0 && n->neighbors[opp] == ptr) {
             n->neighbors[opp] = nullptr;
         }
     }
-
-    // удалить из iterable (если нужно)
-    auto vit = std::find(iterable.begin(), iterable.end(), chunk);
-    if (vit != iterable.end()) iterable.erase(vit);
-
     chunkMap.erase(it);
 }
 
@@ -339,12 +337,52 @@ Chunk* Chunks::getChunkByBlock(int x, int y, int z) {
 }
 
 Chunk* Chunks::getChunk(int x, int y, int z) {
-    auto it = chunkMap.find(ChunkPos{x,y,z});
+    ChunkPos key{x, y, z};
+    std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
+    auto it = chunkMap.find(key);
     if (it == chunkMap.end()) return nullptr;
     return it->second.get();
 }
 
 void Chunks::update(const glm::dvec3 &playerPos) {
+	{
+        std::unique_lock<std::mutex> lk(readyQueueMutex);
+        while (!readyChunks.empty()) {
+            auto c = std::move(readyChunks.front());
+            readyChunks.pop();
+            lk.unlock(); // разблокируем очередь пока вставляем в map
+
+            // Вставляем в map под эксклюзивным shared_mutex
+            {
+                std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+                ChunkPos key{c->x, c->y, c->z};
+                // двойная проверка: возможно уже вставлен другим джобом
+                if (chunkMap.find(key) == chunkMap.end()) {
+                    chunkMap.emplace(key, std::move(c));
+                    // теперь можно обновить соседей, пересчитать свет, построить меш и т.д.
+                    Chunk* inserted = chunkMap.at(key).get();
+                    loadNeighbours(inserted);
+                    calculateLight(inserted);
+
+                    std::array<bool,4> addedAnyGlobal = { false, false, false, false };
+					
+					for (int face = 0; face < 6; ++face) {
+						int idx = faceToIdx(face); // face -> индекс в OFFSETS/neighbors
+						if (idx < 0) continue;
+						Chunk* neigh = inserted->neighbors[idx];
+						if (!neigh) continue;
+						syncBoundaryWithNeigbour(inserted, neigh, face, addedAnyGlobal);
+						neigh->modify();
+					}
+					
+					solverS->solve();
+                }
+            }
+
+            lk.lock(); // снова блокируем очередь, чтобы продолжить
+        }
+    }
+
 	ivec3 playerChunk = worldToChunk3(playerPos);
 
 	if (playerChunk != lastPlayerChunk) {
