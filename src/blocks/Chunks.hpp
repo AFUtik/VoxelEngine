@@ -10,10 +10,17 @@
 #include <array>
 #include <memory>
 
+#include <shared_mutex>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <future>
+
 #include <glm/glm.hpp>
 
 #include "Chunk.hpp"
 #include "ChunkInfo.hpp"
+#include <structures/ThreadPool.hpp>
 
 #include "../lighting/LightSolver.hpp"
 #include "../noise/PerlinNoise.hpp"
@@ -63,6 +70,17 @@ class Chunks {
 	LightSolver* solverG = nullptr;
 	LightSolver* solverB = nullptr;
 	LightSolver* solverS = nullptr;
+
+	// multithreading //
+
+	mutable std::shared_mutex chunkMapMutex;
+	ThreadPool threadPool;
+
+	std::mutex readyQueueMutex;
+    std::queue<std::unique_ptr<Chunk>> readyChunks;
+    std::condition_variable readyCv;
+
+	std::vector<std::future<void>> generationFutures;
 
 	LightSolver* Chunks::getSolver(int chan) {
 		switch(chan) {
