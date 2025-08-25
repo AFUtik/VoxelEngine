@@ -13,6 +13,7 @@
 #include "../Transform.hpp"
 
 #include "../Shader.hpp"
+#include <iostream>
 
 class Camera;
 
@@ -21,8 +22,9 @@ protected:
     std::unique_ptr<Mesh> mesh;
 
     Transform transform;
-    Shader* shader = nullptr;
+    
 public:
+    Shader* shader = nullptr;
     DrawableObject() : mesh(nullptr) {}
     
     inline Mesh* getMesh() {return mesh.get();}

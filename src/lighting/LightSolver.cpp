@@ -5,6 +5,8 @@
 #include "../blocks/Block.hpp"
 
 #include <iostream>
+#include <memory>
+#include <mutex>
 
 LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
 }
@@ -22,7 +24,10 @@ void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk
 	addqueue.write(entry);
 
 	// chunk->modified = true;
-	chunk->setLight(x, y, z, channel, entry.light);
+	{  
+		std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
+		chunk->setLight(x, y, z, channel, entry.light);
+	}
 }
 
 void LightSolver::addLocally(int x, int y, int z, Chunk* chunk) {
@@ -100,18 +105,21 @@ void LightSolver::solve() {
 			int lx = 0, ly = 0, lz = 0;
 			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);
 			if (chunk != nullptr) {
-				const int light = chunk->getLight(lx, ly, lz, channel);
-				block v = chunk->getBlock(lx, ly, lz);
-				if (v.id == 0 && light + 2 <= entry.light) {;
-					chunk->setLight(lx, ly, lz, channel, entry.light - 1);
-					chunk->modify();
-					LightEntry nentry;
-					nentry.lx = lx;
-					nentry.ly = ly;
-					nentry.lz = lz;
-					nentry.light = entry.light - 1;
-					nentry.chunk = chunk;
-					addqueue.write(nentry);
+				{
+					std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
+					const int light = chunk->getLight(lx, ly, lz, channel);
+					block v = chunk->getBlock(lx, ly, lz);
+					if (v.id == 0 && light + 2 <= entry.light) {;
+						chunk->setLight(lx, ly, lz, channel, entry.light - 1);
+						// chunk->modify();
+						LightEntry nentry;
+						nentry.lx = lx;
+						nentry.ly = ly;
+						nentry.lz = lz;
+						nentry.light = entry.light - 1;
+						nentry.chunk = chunk;
+						addqueue.write(nentry);
+					}
 				}
 			}
 		}

@@ -33,26 +33,29 @@
 
 #include <chrono>
 #include <thread>
+#include <filesystem>
 
 int WIDTH = 1920;
 int HEIGHT = 1080;
 
-int main()
+int main(int argc, char* argv[])
 {
+	std::string absolute_path = std::filesystem::absolute(argv[0]).parent_path().string();
+
 	std::ios::sync_with_stdio(false);
 	std::cin.tie(nullptr);
 
 	Window::init(WIDTH, HEIGHT, "Test Window");
 	Events::init();
 
-	Shader* shader = load_shader("res/shaders/core.vert", "res/shaders/core.frag");
+	Shader* shader = load_shader(absolute_path + "\\res\\shaders\\core.vert", absolute_path + "\\res\\shaders\\core.frag");
 	if (shader == nullptr) {
 		std::cerr << "failed to load shader" << std::endl;
 		Window::terminate();
 		return 1;
 	}
 
-	Texture* texture = load_texture("E:/Cpp/VoxelEngine/res/images/block.png");
+	Texture* texture = load_texture(absolute_path + "\\res\\images\\block.png");
 	if (texture == nullptr) {
 		std::cerr << "failed to load texture" << std::endl;
 		delete texture;
@@ -180,8 +183,7 @@ int main()
 			
 			world->update(camera->getPosition());
 
-			frustum->update(projview);
-			
+			//frustum->update(projview);
 			drawContext.render();
 
 			//ImGui::ShowDemoWindow();

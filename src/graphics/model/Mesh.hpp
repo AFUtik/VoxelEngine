@@ -11,12 +11,16 @@
 class Mesh {
 	std::unique_ptr<VertexBuffer> buffer;
 
+	bool uploaded = false;
+
 	uint32_t VBO, VAO;
 	uint32_t vertices  = 0;
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
 	Mesh() : buffer(new VertexBuffer) {}
 	~Mesh();
+
+	inline bool isUploaded() {return uploaded;}
 
 	inline VertexConsumer getConsumer() const {return VertexConsumer(buffer.get());}
 

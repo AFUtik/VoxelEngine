@@ -52,7 +52,7 @@ public:
 
 	inline void set(int x, int y, int z, int channel, int value) {
 		const int index = y * ChunkInfo::DEPTH * ChunkInfo::WIDTH + z * ChunkInfo::WIDTH + x;
-		map[index] = (map[index] & (0xFFFF & (~(0xF << (channel * 4))))) | (value << (channel << 2));
+       		map[index] = (map[index] & (0xFFFF & (~(0xF << (channel * 4))))) | (value << (channel << 2));
 	}
 };
 

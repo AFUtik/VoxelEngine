@@ -15,7 +15,7 @@ class BlockRenderer : public Renderer {
 	ChunkMesher mesher;
 	Chunks* world;
 public:
-	BlockRenderer(Chunks* chunks) : world(chunks) {}
+	BlockRenderer(Chunks* chunks) : world(chunks), mesher(chunks) {}
 
 	void render() override;
 };

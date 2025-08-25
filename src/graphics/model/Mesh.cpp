@@ -6,6 +6,7 @@
 
 void Mesh::upload_buffers() {
 	vertices = buffer->vertices.get_size();
+	uploaded = true;
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);

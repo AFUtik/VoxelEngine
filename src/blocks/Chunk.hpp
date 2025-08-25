@@ -3,6 +3,7 @@
 
 #include <array>
 #include <memory>
+#include <shared_mutex>
 
 #include "ChunkInfo.hpp"
 #include "Block.hpp"
@@ -108,12 +109,15 @@ class Chunks;
 class Chunk {
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
 	Chunk* neighbors[26];
+	mutable std::shared_mutex dataMutex;
 	
 	std::unique_ptr<block[]> blocks;
 	std::unique_ptr<Lightmap> lightmap;
 
 	friend class Chunks;
 	friend class ChunkRLE;
+	friend class ChunkMesher;
+	friend class LightSolver;
 
 	bool modified = false;
 
@@ -203,7 +207,7 @@ public:
 		return chunk->getBlock(nx, ny, nz);
 	}
 
-	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
+   	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
 
 	inline void setBlock(int32_t lx, int32_t ly, int32_t lz, uint8_t id) const {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
 

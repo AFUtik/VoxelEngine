@@ -10,6 +10,8 @@
 
 #include <glm/ext.hpp>
 #include <cmath>
+#include <mutex>
+#include <shared_mutex>
 
 Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 	lightmap(new Lightmap),
@@ -17,6 +19,7 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
 	max(x*ChunkInfo::WIDTH+ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH+ChunkInfo::DEPTH),
 	x(x), y(y), z(z) {
+	std::lock_guard<std::shared_mutex> sl(dataMutex);
 	const float scale = 0.02f;
 	const float scale2 = 0.02f;
 	const float height = 10.0f;
@@ -56,7 +59,7 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 uint8_t Chunk::getBoundLight(int lx, int ly, int lz, int channel) {
 	Chunk* chunk = findNeighbourChunk(lx, ly, lz);
 	if (chunk == nullptr) return 0;
-
+	
 	int localX = lx - (chunk->x-x) * ChunkInfo::WIDTH;
 	int localY = ly - (chunk->y-y) * ChunkInfo::HEIGHT;
 	int localZ = lz - (chunk->z-z) * ChunkInfo::DEPTH;

@@ -77,9 +77,10 @@ class Chunks {
 	ThreadPool threadPool;
 
 	std::mutex readyQueueMutex;
-    std::queue<std::unique_ptr<Chunk>> readyChunks;
+    std::queue<Chunk*> readyChunks;
     std::condition_variable readyCv;
 
+	std::unordered_set<ChunkPos, ChunkPosHash> loadingSet;
 	std::vector<std::future<void>> generationFutures;
 
 	LightSolver* Chunks::getSolver(int chan) {
@@ -110,6 +111,7 @@ class Chunks {
 	void loadChunk  (int x, int y, int z);
 
 	friend class BlockRenderer;
+	friend class ChunkMesher;
 public:
 	std::vector<Chunk*> iterable;
 

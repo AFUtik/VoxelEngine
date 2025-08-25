@@ -1,6 +1,7 @@
 #ifndef LIGHTSOLVER_HPP_
 #define LIGHTSOLVER_HPP_
 
+#include <memory>
 #include <queue>
 #include <cstdint>
 #include <structures/RingBuffer.hpp>
@@ -15,7 +16,7 @@ struct LightEntry {
 	int32_t lz;
 	uint8_t light;
 
-	Chunk *chunk = nullptr;
+	Chunk* chunk;
 };
 
 constexpr int MAX_LIGHT_UPDATES = 1 << 20;

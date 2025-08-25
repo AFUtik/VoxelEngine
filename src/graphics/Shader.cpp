@@ -10,8 +10,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-const static std::string ABSOLUTE_PATH = "E:/Cpp/VoxelEngine/";
-
 Shader::Shader(unsigned int id) : id(id) {
 }
 
@@ -38,8 +36,8 @@ Shader* load_shader(std::string vertexFile, std::string fragmentFile) {
     vShaderFile.exceptions(std::ifstream::badbit);
     fShaderFile.exceptions(std::ifstream::badbit);
     try {
-        vShaderFile.open(ABSOLUTE_PATH + vertexFile);
-        fShaderFile.open(ABSOLUTE_PATH + fragmentFile);
+        vShaderFile.open(vertexFile);
+        fShaderFile.open(fragmentFile);
         std::stringstream vShaderStream, fShaderStream;
 
         vShaderStream << vShaderFile.rdbuf();
