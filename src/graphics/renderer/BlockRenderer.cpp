@@ -27,18 +27,19 @@ void BlockRenderer::render() {
     {
         std::lock_guard lk(mesher.meshUploadMutex);
         while (!mesher.meshUploadQueue.empty()) {
-            Chunk* chunk = mesher.meshUploadQueue.front();
-            
-            chunk->chunk_draw.loadShader(shader);
-            chunk->chunk_draw.getMesh()->upload_buffers();
+            if(auto sp = mesher.meshUploadQueue.front().lock()) {
+                sp->chunk_draw.loadShader(shader);
+                sp->chunk_draw.getMesh()->upload_buffers();
+    
+                double px = static_cast<double>(sp->x) * static_cast<double>(ChunkInfo::WIDTH)  + 0.5;
+                double py = static_cast<double>(sp->y) * static_cast<double>(ChunkInfo::HEIGHT) + 0.5;
+                double pz = static_cast<double>(sp->z) * static_cast<double>(ChunkInfo::DEPTH)  + 0.5;
+    
+                sp->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz));
+                
+                mesher.meshUploadQueue.pop();
+            }
 
-            double px = static_cast<double>(chunk->x) * static_cast<double>(ChunkInfo::WIDTH)  + 0.5;
-            double py = static_cast<double>(chunk->y) * static_cast<double>(ChunkInfo::HEIGHT) + 0.5;
-            double pz = static_cast<double>(chunk->z) * static_cast<double>(ChunkInfo::DEPTH)  + 0.5;
-
-            chunk->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz));
-            
-            mesher.meshUploadQueue.pop();
         }
     }
 
@@ -46,7 +47,7 @@ void BlockRenderer::render() {
         if(chunk->isModified()) {
             {
                 std::lock_guard lk(world->readyQueueMutex);
-                world->readyChunks.push(chunk.get());
+                world->readyChunks.push(chunk);
             }
             chunk->unmodify();
             world->readyCv.notify_one();

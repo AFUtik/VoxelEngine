@@ -32,7 +32,7 @@ class ChunkMesher {
     Chunks* world; 
 
     std::mutex meshUploadMutex;
-    std::queue<Chunk*> meshUploadQueue;
+    std::queue<std::weak_ptr<Chunk>> meshUploadQueue;
     std::condition_variable meshUploadCv;
 
     std::thread worker;
@@ -221,7 +221,7 @@ public:
 
     void meshWorkerThread() {
         while (true) {
-            Chunk* cd;
+            std::weak_ptr<Chunk> cd;
             {
                 std::unique_lock lk(world->readyQueueMutex);
                 world->readyCv.wait(lk, [&] {
@@ -233,17 +233,20 @@ public:
                 cd = world->readyChunks.front();
                 world->readyChunks.pop();
             }
+            
 
-            {
-                std::unique_lock<std::shared_mutex> wlock(cd->dataMutex);
-                cd->chunk_draw.loadMesh(makeChunk(cd)); // запись
-            }
+            if (auto sp = cd.lock()) {
+                {
+                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                    sp->chunk_draw.loadMesh(makeChunk(sp.get())); // запись
+                }
 
-            {
-                std::lock_guard lk(meshUploadMutex);
-                meshUploadQueue.push(cd);
+                {
+                    std::lock_guard lk(meshUploadMutex);
+                    meshUploadQueue.push(sp);
+                }
+                meshUploadCv.notify_one();   
             }
-            meshUploadCv.notify_one();   
         }
     }
 

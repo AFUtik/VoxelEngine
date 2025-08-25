@@ -57,7 +57,7 @@ class Chunks {
 	/*
 	 * Used to find a chunk near player.
 	 */
-	std::unordered_map<ChunkPos, std::unique_ptr<Chunk>, ChunkPosHash> chunkMap;
+	std::unordered_map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosHash> chunkMap;
 
 	/*
 	 * Used to not close chunks and store them as compressed chunks using RLE algorithm.
@@ -77,7 +77,7 @@ class Chunks {
 	ThreadPool threadPool;
 
 	std::mutex readyQueueMutex;
-    std::queue<Chunk*> readyChunks;
+    std::queue<std::weak_ptr<Chunk>> readyChunks;
     std::condition_variable readyCv;
 
 	std::unordered_set<ChunkPos, ChunkPosHash> loadingSet;

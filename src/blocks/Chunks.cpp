@@ -212,14 +212,14 @@ void Chunks::loadChunk(int x, int y, int z) {
 
     auto fut = threadPool.submit([this, pos]() {
         // 1) Создаём локальный unique_ptr (локальная владение пока)
-    	Chunk* uptr = new Chunk(pos.x, pos.y, pos.z, noise);
+    	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
 
         // 2) Попытка вставить в map под эксклюзивным локом (double-check)
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
             auto it = chunkMap.find(pos);
             if (it == chunkMap.end()) {
-                chunkMap.emplace(pos, std::unique_ptr<Chunk>(uptr));
+                chunkMap.emplace(pos, sptr);
             } else {
                 // Кто-то уже вставил — снимаем флаг загрузки и выходим
                 loadingSet.erase(pos);
@@ -231,20 +231,23 @@ void Chunks::loadChunk(int x, int y, int z) {
         //    Выполняем CPU-инициализацию под shared_lock (чтение соседей и т.д.)
         {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-            loadNeighbours(uptr);                     // читает chunkMap
-            calculateLight(uptr);                     // должна быть потокобезопасна при чтении соседей
+            loadNeighbours(sptr.get());                     // читает chunkMap
+            calculateLight(sptr.get());                     // должна быть потокобезопасна при чтении соседей
 
             std::array<bool,4> addedAnyGlobal = {false,false,false,false};
-            for (int face = 0; face < 6; ++face) {
-                int idx = faceToIdx(face);
-                if (idx < 0) continue;
+			
+			for (int face = 0; face < 6; ++face) {
+				int idx = faceToIdx(face);
+				if (idx < 0) continue;
 
-				Chunk* neigh = uptr->neighbors[idx];
+				Chunk* neigh = sptr->neighbors[idx];
 				if(neigh == nullptr) continue;
 				
-				syncBoundaryWithNeigbour(uptr, neigh, face, addedAnyGlobal);
+				syncBoundaryWithNeigbour(sptr.get(), neigh, face, addedAnyGlobal);
 				neigh->modify();
-            }
+				
+			}
+			
         }
 
         // 4) (опционально) реши, где вызывать solverS->solve(): здесь — только если он потокобезопасен
@@ -253,7 +256,7 @@ void Chunks::loadChunk(int x, int y, int z) {
         // 5) Помещаем готовый чанк в очередь для мэшера/рендера (map владеет объектом)
         {
             std::lock_guard<std::mutex> ql(readyQueueMutex);
-            readyChunks.push(uptr);
+            readyChunks.push(sptr);
         }
 
         // 6) Снять флаг loading
@@ -287,8 +290,11 @@ void Chunks::unloadChunk(int x, int y, int z) {
 				if (!nbr) continue;
 				int opp = 25 - i;
 				
-				if (nbr->neighbors[opp] == ptr) {
-					nbr->neighbors[opp] = nullptr;
+				{
+					std::unique_lock<std::shared_mutex> ul(nbr->dataMutex);
+					if (nbr->neighbors[opp] == ptr) {
+						nbr->neighbors[opp] = nullptr;
+					}
 				}
 			}
 			chunkMap.erase(it);

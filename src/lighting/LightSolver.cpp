@@ -5,8 +5,8 @@
 #include "../blocks/Block.hpp"
 
 #include <iostream>
-#include <memory>
 #include <mutex>
+#include <shared_mutex>
 
 LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
 }
@@ -103,7 +103,8 @@ void LightSolver::solve() {
 			const int z = entry.lz + OFFS[i][2];
 
 			int lx = 0, ly = 0, lz = 0;
-			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);
+			
+			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);		
 			if (chunk != nullptr) {
 				{
 					std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
