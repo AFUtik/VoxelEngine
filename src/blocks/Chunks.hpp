@@ -92,7 +92,7 @@ class Chunks {
 	}
 
 	// Neighbour methods //
-	void loadNeighbours(Chunk* chunk);
+	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	
 	void processBoundaryBlock(
 		Chunk* A, Chunk* B, 

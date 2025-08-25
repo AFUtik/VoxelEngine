@@ -230,17 +230,22 @@ public:
                 if (stop && world->readyChunks.empty())
                     break;
 
+
                 cd = world->readyChunks.front();
                 world->readyChunks.pop();
             }
             
 
             if (auto sp = cd.lock()) {
+                Mesh* mesh;
                 {
                     std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    sp->chunk_draw.loadMesh(makeChunk(sp.get())); // запись
+                    mesh = makeChunk(sp.get());
                 }
-
+                {
+                    std::unique_lock<std::shared_mutex> wl(sp->dataMutex);
+                    sp->chunk_draw.loadMesh(mesh);
+                }
                 {
                     std::lock_guard lk(meshUploadMutex);
                     meshUploadQueue.push(sp);

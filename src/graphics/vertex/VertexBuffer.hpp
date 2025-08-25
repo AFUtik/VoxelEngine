@@ -8,6 +8,7 @@ struct VertexBuffer {
     packed_freelist<Vertex> vertices;
 
 	VertexBuffer() : vertices(64) {}
+    ~VertexBuffer() = default;
 };
 
 #endif

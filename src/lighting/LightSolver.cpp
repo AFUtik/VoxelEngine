@@ -5,6 +5,7 @@
 #include "../blocks/Block.hpp"
 
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 
@@ -99,16 +100,15 @@ void LightSolver::solve() {
 
 		for (size_t i = 0; i < 6; i++) {
 			const int x = entry.lx + OFFS[i][0];
-			const int y = entry.ly + OFFS[i][1];
+			const int y = entry.ly + OFFS[i][1];  
 			const int z = entry.lz + OFFS[i][2];
-
+          
 			int lx = 0, ly = 0, lz = 0;
 			
-			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);		
-			if (chunk != nullptr) {
-				{
-					std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
-					const int light = chunk->getLight(lx, ly, lz, channel);
+			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);
+			if (chunk) {
+
+					int light = chunk->getLight(lx, ly, lz, channel);
 					block v = chunk->getBlock(lx, ly, lz);
 					if (v.id == 0 && light + 2 <= entry.light) {;
 						chunk->setLight(lx, ly, lz, channel, entry.light - 1);
@@ -120,7 +120,7 @@ void LightSolver::solve() {
 						nentry.light = entry.light - 1;
 						nentry.chunk = chunk;
 						addqueue.write(nentry);
-					}
+					
 				}
 			}
 		}

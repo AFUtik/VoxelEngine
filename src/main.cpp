@@ -32,6 +32,7 @@
 #include "glm/ext.hpp"
 
 #include <chrono>
+#include <mutex>
 #include <thread>
 #include <filesystem>
 

@@ -106,10 +106,9 @@ static inline int faceToIdx(int face) {
 
 class Chunks;
 
-class Chunk {
+class Chunk : public std::enable_shared_from_this<Chunk> {
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
-	Chunk* neighbors[26];
-	mutable std::shared_mutex dataMutex;
+	std::weak_ptr<Chunk> neighbors[26];
 	
 	std::unique_ptr<block[]> blocks;
 	std::unique_ptr<Lightmap> lightmap;
@@ -119,11 +118,17 @@ class Chunk {
 	friend class ChunkMesher;
 	friend class LightSolver;
 
-	bool modified = false;
+	std::atomic<bool> modified{false};
 
 	Chunks* world;
 public:
+	mutable std::shared_mutex dataMutex;
 	DrawableObject chunk_draw;
+
+	
+	inline void modify() { modified.store(true, std::memory_order_relaxed); }
+	inline void unmodify() { modified.store(false, std::memory_order_relaxed); }
+	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
 
 	// World Pos //
 	int32_t x, y, z;
@@ -131,10 +136,6 @@ public:
 	glm::vec3 max;
 
 	Chunk(int x, int y, int z) : x(x), y(y), z(z) {}
-
-	inline void unmodify() {modified = false;}
-	inline void modify() {modified = true;}
-	inline bool isModified() {return modified;}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {
 		int dx = (lx < 0) ? -1 : (lx >= ChunkInfo::WIDTH ? 1 : 0);
@@ -159,7 +160,8 @@ public:
 		}
 		int idx = getNeighbourIndex(bx, by, bz);
 		if (idx < 0 || idx >= 26) return nullptr;
-		return neighbors[idx];
+		auto sp = neighbors[idx].lock();
+    	return sp ? sp.get() : nullptr;
 	}
 
 	/*
@@ -181,8 +183,10 @@ public:
 		}
 		int idx = getNeighbourIndex(lx, ly, lz);
 		if (idx < 0 || idx >= 26) return nullptr;
-		Chunk* chunk = neighbors[idx];
-		if (!chunk) return nullptr;
+
+		auto sp = neighbors[idx].lock();
+    	if (!sp) return nullptr;
+    	Chunk* chunk = sp.get();
 
 		out_x = lx - (chunk->x - x) * ChunkInfo::WIDTH;
 		out_y = ly - (chunk->y - y) * ChunkInfo::HEIGHT;
@@ -197,7 +201,7 @@ public:
 			return getBlock(lx, ly, lz);
 		}
 		int nx, ny, nz;
-		Chunk* chunk = findNeighbourChunk(lx, ly, lz, nx, ny, nz);
+		Chunk *chunk = findNeighbourChunk(lx, ly, lz, nx, ny, nz);
 		if (!chunk) return block{};
 		if (nx < 0 || nx >= ChunkInfo::WIDTH ||
 			ny < 0 || ny >= ChunkInfo::HEIGHT ||

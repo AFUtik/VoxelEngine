@@ -17,7 +17,7 @@ class Mesh {
 	uint32_t vertices  = 0;
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
-	Mesh() : buffer(new VertexBuffer) {}
+	Mesh() : buffer(std::make_unique<VertexBuffer>()) {}
 	~Mesh();
 
 	inline bool isUploaded() {return uploaded;}

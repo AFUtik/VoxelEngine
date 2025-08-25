@@ -36,7 +36,7 @@ Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), threadPool(1)  {
 
 }
 
-void Chunks::loadNeighbours(Chunk* chunk) {
+void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
     for (int i = 0; i < 26; ++i) {
         int nx = chunk->x + OFFSETS[i][0];
         int ny = chunk->y + OFFSETS[i][1];
@@ -44,21 +44,12 @@ void Chunks::loadNeighbours(Chunk* chunk) {
 
         auto it = chunkMap.find(ChunkPos{nx, ny, nz});
         if (it != chunkMap.end()) {
-			Chunk* neighbour = it->second.get();
-			{
-				std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
-				chunk->neighbors[i] = neighbour;
-			}
+            auto& neigh = it->second;
 
-			{
-				std::lock_guard<std::shared_mutex> m(neighbour->dataMutex);
-            	neighbour->neighbors[25-i] = chunk;
-			}
-        } else {
-            {
-				std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
-				chunk->neighbors[i] = nullptr;
-			}
+            // Лочим оба чанка сразу, чтобы избежать дедлока
+            std::scoped_lock lock(chunk->dataMutex, neigh->dataMutex);
+            chunk->neighbors[i]     = neigh;
+            neigh->neighbors[25 - i] = chunk;
         }
     }
 }
@@ -92,7 +83,7 @@ void Chunks::processBoundaryBlock(
                 getSolver(chan)->addLocally(bx, by, bz, static_cast<int>(L_a), B);
                 addedAny[chan] = true;
             } else {
-                solverS->addLocally(ax, ay, bz, B);
+                solverS->addLocally(ax, ay, az, B);
                 addedAny[3] = true;
             }
         }
@@ -152,10 +143,8 @@ void Chunks::calculateLight(Chunk* chunk) {
 					break;
 				}
 
-				{
-					std::lock_guard<std::shared_mutex> sl(chunk->dataMutex);
 					chunk->setLight(x, y, z, 3, 0xF);
-				}
+				
 			}
 		}
 	}
@@ -175,10 +164,9 @@ void Chunks::calculateLight(Chunk* chunk) {
 					chunk->getBoundLight(x, y, z-1, 3) == 0 ||
 					chunk->getBoundLight(x, y, z+1, 3) == 0
 					) solverS->addLocally(x, y, z, chunk);
-				{
-					std::lock_guard<std::shared_mutex> sl(chunk->dataMutex);
+
 					chunk->setLight(x, y, z, 3, 0xF);
-				}
+				
 			}
 		}
 	}
@@ -210,6 +198,7 @@ void Chunks::loadChunk(int x, int y, int z) {
         loadingSet.insert(pos);
     }
 
+
     auto fut = threadPool.submit([this, pos]() {
         // 1) Создаём локальный unique_ptr (локальная владение пока)
     	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
@@ -231,27 +220,24 @@ void Chunks::loadChunk(int x, int y, int z) {
         //    Выполняем CPU-инициализацию под shared_lock (чтение соседей и т.д.)
         {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-            loadNeighbours(sptr.get());                     // читает chunkMap
+            loadNeighbours(sptr);                     // читает chunkMap
             calculateLight(sptr.get());                     // должна быть потокобезопасна при чтении соседей
 
             std::array<bool,4> addedAnyGlobal = {false,false,false,false};
-			
-			for (int face = 0; face < 6; ++face) {
-				int idx = faceToIdx(face);
-				if (idx < 0) continue;
+            for (int face = 0; face < 6; ++face) {
+                int idx = faceToIdx(face);
+                if (idx < 0) continue;
 
-				Chunk* neigh = sptr->neighbors[idx];
-				if(neigh == nullptr) continue;
-				
-				syncBoundaryWithNeigbour(sptr.get(), neigh, face, addedAnyGlobal);
-				neigh->modify();
-				
-			}
-			
+				if (auto neigh_sp = sptr->neighbors[idx].lock()) {
+					syncBoundaryWithNeigbour(sptr.get(), neigh_sp.get(), face, addedAnyGlobal);
+					neigh_sp->modify();
+				}
+            }
+			solverS->solve();
         }
 
         // 4) (опционально) реши, где вызывать solverS->solve(): здесь — только если он потокобезопасен
-        solverS->solve();
+        
 
         // 5) Помещаем готовый чанк в очередь для мэшера/рендера (map владеет объектом)
         {
@@ -274,32 +260,32 @@ void Chunks::loadChunk(int x, int y, int z) {
 
 void Chunks::unloadChunk(int x, int y, int z) {
 	ChunkPos key{x,y,z};
-	Chunk* ptr;
+    std::shared_ptr<Chunk> sptr; // держим shared_ptr, пока чистим
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         auto it = chunkMap.find(key);
         if (it == chunkMap.end()) return;
-        ptr = it->second.get();
-        
+        sptr = it->second; // копия shared_ptr, пока работаем с соседями
+    }
 
-        // пока держим mapLock — соседи живы (не выгружены параллельно)
-		{
-			std::unique_lock<std::shared_mutex> nlock(ptr->dataMutex);
-			for (int i = 0; i < 26; ++i) {
-				Chunk* nbr = ptr->neighbors[i];
-				if (!nbr) continue;
-				int opp = 25 - i;
-				
-				{
-					std::unique_lock<std::shared_mutex> ul(nbr->dataMutex);
-					if (nbr->neighbors[opp] == ptr) {
-						nbr->neighbors[opp] = nullptr;
-					}
-				}
-			}
-			chunkMap.erase(it);
-		}
-    } // mapLock освободился только здесь
+    {
+        std::unique_lock<std::shared_mutex> nlock(sptr->dataMutex);
+        for (int i = 0; i < 26; ++i) {
+            if (auto nbr = sptr->neighbors[i].lock()) {
+                int opp = 25 - i;
+                std::unique_lock<std::shared_mutex> ul(nbr->dataMutex);
+                if (auto back = nbr->neighbors[opp].lock()) {
+                    if (back.get() == sptr.get())
+                        nbr->neighbors[opp].reset();
+                }
+            }
+        }
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+        chunkMap.erase(key);
+    }
 	
 }
 

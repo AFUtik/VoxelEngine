@@ -3,9 +3,12 @@
 
 #include "../blocks/ChunkInfo.hpp"
 
+#include <shared_mutex>
+
 class Lightmap {
 public:
 	unsigned short* map;
+	std::shared_mutex lightMutex;
 
 	Lightmap();
 	~Lightmap();

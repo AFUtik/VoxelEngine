@@ -30,7 +30,9 @@ public:
     inline Mesh* getMesh() {return mesh.get();}
     inline Transform& getTransform() {return transform;}
 
-    inline void loadMesh(Mesh* mesh) {this->mesh.reset(mesh);}
+    inline void loadMesh(Mesh* mesh) {
+        this->mesh.reset(mesh);
+    }
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {
