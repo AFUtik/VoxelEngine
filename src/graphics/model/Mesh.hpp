@@ -18,6 +18,7 @@ class Mesh {
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
 	Mesh() : buffer(std::make_unique<VertexBuffer>()) {}
+	
 	~Mesh();
 
 	inline bool isUploaded() {return uploaded;}

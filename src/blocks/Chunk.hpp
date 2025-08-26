@@ -106,7 +106,7 @@ static inline int faceToIdx(int face) {
 
 class Chunks;
 
-class Chunk : public std::enable_shared_from_this<Chunk> {
+class Chunk  {
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
 	std::weak_ptr<Chunk> neighbors[26];
 	
@@ -129,6 +129,7 @@ public:
 	inline void modify() { modified.store(true, std::memory_order_relaxed); }
 	inline void unmodify() { modified.store(false, std::memory_order_relaxed); }
 	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
+	inline bool test_and_clear_modified() { return modified.exchange(false, std::memory_order_acq_rel); }
 
 	// World Pos //
 	int32_t x, y, z;
@@ -160,8 +161,7 @@ public:
 		}
 		int idx = getNeighbourIndex(bx, by, bz);
 		if (idx < 0 || idx >= 26) return nullptr;
-		auto sp = neighbors[idx].lock();
-    	return sp ? sp.get() : nullptr;
+    	return neighbors[idx].lock().get();
 	}
 
 	/*
@@ -184,9 +184,9 @@ public:
 		int idx = getNeighbourIndex(lx, ly, lz);
 		if (idx < 0 || idx >= 26) return nullptr;
 
-		auto sp = neighbors[idx].lock();
-    	if (!sp) return nullptr;
-    	Chunk* chunk = sp.get();
+		Chunk* chunk = neighbors[idx].lock().get();
+    	if (!chunk) return nullptr;
+    	
 
 		out_x = lx - (chunk->x - x) * ChunkInfo::WIDTH;
 		out_y = ly - (chunk->y - y) * ChunkInfo::HEIGHT;

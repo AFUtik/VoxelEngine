@@ -230,12 +230,11 @@ void Chunks::loadChunk(int x, int y, int z) {
 
 				if (auto neigh_sp = sptr->neighbors[idx].lock()) {
 					syncBoundaryWithNeigbour(sptr.get(), neigh_sp.get(), face, addedAnyGlobal);
-					neigh_sp->modify();
+                    readyChunks.push(neigh_sp);
 				}
             }
-			solverS->solve();
         }
-
+        solverS->solve();
         // 4) (опционально) реши, где вызывать solverS->solve(): здесь — только если он потокобезопасен
         
 
@@ -243,6 +242,7 @@ void Chunks::loadChunk(int x, int y, int z) {
         {
             std::lock_guard<std::mutex> ql(readyQueueMutex);
             readyChunks.push(sptr);
+            readyCv.notify_one();
         }
 
         // 6) Снять флаг loading
@@ -252,7 +252,7 @@ void Chunks::loadChunk(int x, int y, int z) {
         }
 
         // 7) Сигналим главный поток (notify_one достаточно)
-        readyCv.notify_one();
+        
     });
 
     generationFutures.emplace_back(std::move(fut));
@@ -268,25 +268,22 @@ void Chunks::unloadChunk(int x, int y, int z) {
         sptr = it->second; // копия shared_ptr, пока работаем с соседями
     }
 
-    {
-        std::unique_lock<std::shared_mutex> nlock(sptr->dataMutex);
-        for (int i = 0; i < 26; ++i) {
-            if (auto nbr = sptr->neighbors[i].lock()) {
-                int opp = 25 - i;
-                std::unique_lock<std::shared_mutex> ul(nbr->dataMutex);
-                if (auto back = nbr->neighbors[opp].lock()) {
-                    if (back.get() == sptr.get())
-                        nbr->neighbors[opp].reset();
-                }
-            }
+    for (int i = 0; i < 26; ++i) {
+    if (auto nbr = sptr->neighbors[i].lock()) {
+        int opp = 25 - i;
+        // захватываем оба одновременно, чтобы избежать дедлока
+        std::scoped_lock lock(sptr->dataMutex, nbr->dataMutex);
+        if (auto back = nbr->neighbors[opp].lock()) {
+            if (back.get() == sptr.get())
+                nbr->neighbors[opp].reset();
         }
     }
+}
 
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);
     }
-	
 }
 
 
@@ -351,6 +348,11 @@ Chunk* Chunks::getChunk(int x, int y, int z) {
 }
 
 void Chunks::update(const glm::dvec3 &playerPos) {
+    generationFutures.erase(
+    std::remove_if(generationFutures.begin(), generationFutures.end(),
+                   [](std::future<void>& f){ return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; }),
+    generationFutures.end());
+
 	ivec3 playerChunk = worldToChunk3(playerPos);
 
 	if (playerChunk != lastPlayerChunk) {

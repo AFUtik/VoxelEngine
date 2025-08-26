@@ -109,7 +109,8 @@ int main(int argc, char* argv[])
 
 	DrawContext drawContext(new Renderer(camera, shader, frustum));
 
-	drawContext.registerRenderer("world_renderer", new BlockRenderer(world));
+	BlockRenderer* brenderer = new BlockRenderer(world);
+	drawContext.registerRenderer("world_renderer", brenderer);
 
 	Events::toggle_cursor();
 	while (!Window::isShouldClose()) {

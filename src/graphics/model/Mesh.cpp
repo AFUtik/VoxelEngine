@@ -6,7 +6,7 @@
 
 void Mesh::upload_buffers() {
 	vertices = buffer->vertices.get_size();
-	uploaded = true;
+	
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -26,6 +26,8 @@ void Mesh::upload_buffers() {
 		i++;
 	}
 	glBindVertexArray(0);
+	
+	uploaded = true;
 }
 
 void Mesh::updateVBO(unsigned int offset, unsigned int amount) {

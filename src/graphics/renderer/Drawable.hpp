@@ -15,24 +15,25 @@
 #include "../Shader.hpp"
 #include <iostream>
 
+#include <shared_mutex>
+
 class Camera;
 
 class DrawableObject {
 protected:
     std::unique_ptr<Mesh> mesh;
-
     Transform transform;
     
 public:
+    std::shared_mutex meshMutex;
     Shader* shader = nullptr;
+    
     DrawableObject() : mesh(nullptr) {}
     
     inline Mesh* getMesh() {return mesh.get();}
     inline Transform& getTransform() {return transform;}
 
-    inline void loadMesh(Mesh* mesh) {
-        this->mesh.reset(mesh);
-    }
+    void loadMesh(Mesh* mesh);
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {

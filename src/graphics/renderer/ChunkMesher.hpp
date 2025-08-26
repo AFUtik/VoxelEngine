@@ -15,7 +15,6 @@
 #include "structures/ThreadPool.hpp"
 
 #include <memory>
-#include <shared_mutex>
 #include <mutex>
 
 using namespace glm;
@@ -32,7 +31,9 @@ class ChunkMesher {
     Chunks* world; 
 
     std::mutex meshUploadMutex;
-    std::queue<std::weak_ptr<Chunk>> meshUploadQueue;
+
+    std::queue<std::pair<Mesh*, std::shared_ptr<Chunk>>> meshUploadQueue;
+
     std::condition_variable meshUploadCv;
 
     std::thread worker;
@@ -219,41 +220,7 @@ public:
         return mesh;
     }
 
-    void meshWorkerThread() {
-        while (true) {
-            std::weak_ptr<Chunk> cd;
-            {
-                std::unique_lock lk(world->readyQueueMutex);
-                world->readyCv.wait(lk, [&] {
-                    return stop || !world->readyChunks.empty();
-                });
-                if (stop && world->readyChunks.empty())
-                    break;
-
-
-                cd = world->readyChunks.front();
-                world->readyChunks.pop();
-            }
-            
-
-            if (auto sp = cd.lock()) {
-                Mesh* mesh;
-                {
-                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    mesh = makeChunk(sp.get());
-                }
-                {
-                    std::unique_lock<std::shared_mutex> wl(sp->dataMutex);
-                    sp->chunk_draw.loadMesh(mesh);
-                }
-                {
-                    std::lock_guard lk(meshUploadMutex);
-                    meshUploadQueue.push(sp);
-                }
-                meshUploadCv.notify_one();   
-            }
-        }
-    }
+    void meshWorkerThread();
 
     inline void modifyCube() {}
 

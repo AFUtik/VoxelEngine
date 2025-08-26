@@ -12,9 +12,10 @@ class Frustum;
 #include "Renderer.hpp"
 
 class BlockRenderer : public Renderer {
-	ChunkMesher mesher;
+	
 	Chunks* world;
 public:
+	ChunkMesher mesher;
 	BlockRenderer(Chunks* chunks) : world(chunks), mesher(chunks) {}
 
 	void render() override;

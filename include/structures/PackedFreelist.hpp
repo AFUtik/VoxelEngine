@@ -6,6 +6,7 @@
 #define PACKEDFREELIST_HPP
 
 #include <cstdint>
+#include <iostream>
 
 template<typename T>
 class packed_freelist {
