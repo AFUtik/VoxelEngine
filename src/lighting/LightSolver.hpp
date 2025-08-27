@@ -16,7 +16,7 @@ struct LightEntry {
 	int32_t lz;
 	uint8_t light;
 
-	Chunk* chunk;
+	std::weak_ptr<Chunk> chunk;
 };
 
 constexpr int MAX_LIGHT_UPDATES = 1 << 20;
@@ -35,7 +35,7 @@ public:
 	 * @param y local
 	 * @param z local
 	 */
-	void addLocally(int x, int y, int z, Chunk* chunk);
+	void addLocally(int x, int y, int z, const std::shared_ptr<Chunk>& chunk);
 
 	/*
 	 * Adds light with specified emission right in chunk without chunk finding.
@@ -43,7 +43,7 @@ public:
 	 * @param y local
 	 * @param z local
 	 */
-	void addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk);
+	void addLocally(int x, int y, int z, uint8_t emission, const std::shared_ptr<Chunk>& chunk);
 
 	void remove(int x, int y, int z);
 

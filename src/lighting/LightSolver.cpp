@@ -9,10 +9,14 @@
 #include <mutex>
 #include <shared_mutex>
 
+const int OFFS[6][3] = {
+	{0,0,1}, {0,0,-1}, {0,1,0}, {0,-1,0}, {1,0,0}, {-1,0,0}
+};
+
 LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
 }
 
-void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk) {
+void LightSolver::addLocally(int x, int y, int z, uint8_t emission, const std::shared_ptr<Chunk>& chunk) {
 	if (emission <= 1)
 		return;
 
@@ -25,18 +29,15 @@ void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk
 	addqueue.write(entry);
 
 	// chunk->modified = true;
-	{  
-		std::lock_guard<std::shared_mutex> m(chunk->dataMutex);
-		chunk->setLight(x, y, z, channel, entry.light);
-	}
+	chunk->setLight(x, y, z, channel, entry.light);
 }
 
-void LightSolver::addLocally(int x, int y, int z, Chunk* chunk) {
+void LightSolver::addLocally(int x, int y, int z, const std::shared_ptr<Chunk>& chunk) {
 	addLocally(x, y, z, chunk->getLight(x, y, z, channel), chunk);
 }
 
 void LightSolver::remove(int x, int y, int z) {
-	Chunk* chunk = chunks->getChunkByBlock(x, y, z);
+	std::shared_ptr<Chunk> chunk = chunks->getChunkByBlock(x, y, z);
 	if (chunk == nullptr)
 		return;
 
@@ -55,10 +56,6 @@ void LightSolver::remove(int x, int y, int z) {
 	chunk->setLight(entry.lx - chunk->x * ChunkInfo::WIDTH, entry.ly - chunk->y * ChunkInfo::HEIGHT, entry.lz - chunk->z * ChunkInfo::DEPTH, channel, 0);
 }
 
-const int OFFS[6][3] = {
-	{0,0,1}, {0,0,-1}, {0,1,0}, {0,-1,0}, {1,0,0}, {-1,0,0}
-};
-
 void LightSolver::solve() {
 	while (!remqueue.empty()) {
 		LightEntry entry = remqueue.read();
@@ -67,7 +64,7 @@ void LightSolver::solve() {
 			int x = entry.lx + OFFS[i][0];
 			int y = entry.ly + OFFS[i][1];
 			int z = entry.lz + OFFS[i][2];
-			Chunk* chunk = chunks->getChunkByBlock(x, y, z);
+			std::shared_ptr<Chunk> chunk = chunks->getChunkByBlock(x, y, z);
 			if (chunk) {
 				int light = chunks->getLight(x, y, z, channel);
 				if (light != 0 && light == entry.light - 1) {
@@ -95,33 +92,36 @@ void LightSolver::solve() {
 	while (!addqueue.empty()) {
 		LightEntry entry = addqueue.read();
 
+		Chunk* entry_chunk = entry.chunk.lock().get();
+		if (!entry_chunk) continue;
+
 		if (entry.light <= 1)
 			continue;
 
 		for (size_t i = 0; i < 6; i++) {
 			const int x = entry.lx + OFFS[i][0];
-			const int y = entry.ly + OFFS[i][1];  
+			const int y = entry.ly + OFFS[i][1];
 			const int z = entry.lz + OFFS[i][2];
-          
-			int lx = 0, ly = 0, lz = 0;
-			
-			Chunk* chunk = entry.chunk->findNeighbourChunk(x, y, z, lx, ly, lz);
-			if (chunk) {
 
-					int light = chunk->getLight(lx, ly, lz, channel);
-					block v = chunk->getBlock(lx, ly, lz);
-					if (v.id == 0 && light + 2 <= entry.light) {;
-						chunk->setLight(lx, ly, lz, channel, entry.light - 1);
-						// chunk->modify();
-						LightEntry nentry;
-						nentry.lx = lx;
-						nentry.ly = ly;
-						nentry.lz = lz;
-						nentry.light = entry.light - 1;
-						nentry.chunk = chunk;
-						addqueue.write(nentry);
-					
-				}
+			Chunk *chunk = entry_chunk->findNeighbourChunk(x, y, z);
+			
+			if(!chunk) continue;
+
+			int lx, ly, lz;
+			Chunk::local(lx, ly, lz, x, y, z);
+
+			block v = chunk->getBlock(lx, ly, lz);
+			unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
+			
+			if (v.id == 0 && static_cast<int>(curLight) + 2 <= entry.light) {
+				chunk->setLight(lx, ly, lz, channel, entry.light - 1);
+				LightEntry nentry;
+				nentry.lx = lx;
+				nentry.ly = ly;
+				nentry.lz = lz;
+				nentry.light = entry.light - 1;
+				nentry.chunk = chunk->weak_self;
+				addqueue.write(nentry);
 			}
 		}
 	}

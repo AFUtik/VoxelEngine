@@ -10,6 +10,7 @@
 
 #include <glm/ext.hpp>
 #include <cmath>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 
@@ -57,12 +58,11 @@ Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 }
 
 uint8_t Chunk::getBoundLight(int lx, int ly, int lz, int channel) {
-	Chunk* chunk = findNeighbourChunk(lx, ly, lz);
-	if (chunk == nullptr) return 0;
-	
-	int localX = lx - (chunk->x-x) * ChunkInfo::WIDTH;
-	int localY = ly - (chunk->y-y) * ChunkInfo::HEIGHT;
-	int localZ = lz - (chunk->z-z) * ChunkInfo::DEPTH;
+	Chunk *chunk = findNeighbourChunk(lx, ly, lz);
+	if (!chunk) return 0;
+
+	int localX, localY, localZ;
+	local(localX, localY, localZ, lx, ly, lz);
 
 	return chunk->lightmap->get(localX, localY, localZ, channel);
 }

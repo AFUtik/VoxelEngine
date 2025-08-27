@@ -106,9 +106,10 @@ static inline int faceToIdx(int face) {
 
 class Chunks;
 
-class Chunk  {
+class Chunk : public std::enable_shared_from_this<Chunk> {
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
 	std::weak_ptr<Chunk> neighbors[26];
+	std::weak_ptr<Chunk> weak_self;
 	
 	std::unique_ptr<block[]> blocks;
 	std::unique_ptr<Lightmap> lightmap;
@@ -137,6 +138,24 @@ public:
 	glm::vec3 max;
 
 	Chunk(int x, int y, int z) : x(x), y(y), z(z) {}
+	
+	/*
+	 * Transforms global coordinates into local coords.
+	 */
+	static inline void local(int& lx, int& ly, int& lz, int x, int y, int z) {
+		lx = x - floorDiv(x, ChunkInfo::WIDTH)  * ChunkInfo::WIDTH;
+		ly = y - floorDiv(y, ChunkInfo::HEIGHT) * ChunkInfo::HEIGHT;
+		lz = z - floorDiv(z, ChunkInfo::DEPTH)  * ChunkInfo::DEPTH;
+	}
+
+	/*
+	 * Transforms local coordinates into global coords.
+	 */
+	static inline void global(int& gx, int& gy, int& gz, int x, int y, int z, Chunk* chunk) {
+		gx = x + chunk->x * ChunkInfo::WIDTH;
+		gy = y + chunk->y * ChunkInfo::HEIGHT;
+		gz = z + chunk->z * ChunkInfo::DEPTH;
+	}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {
 		int dx = (lx < 0) ? -1 : (lx >= ChunkInfo::WIDTH ? 1 : 0);
@@ -147,6 +166,7 @@ public:
 		return NEI_INDEX_BY_ENCODE[ encode3(dx, dy, dz) ];
 	}
 
+	
 	/*
 	 * Finds neighbour chunk of current chunk.
 	 * @param bx local
@@ -201,7 +221,9 @@ public:
 			return getBlock(lx, ly, lz);
 		}
 		int nx, ny, nz;
-		Chunk *chunk = findNeighbourChunk(lx, ly, lz, nx, ny, nz);
+		Chunk *chunk = findNeighbourChunk(lx, ly, lz);
+		local(nx, ny, nz, lx, ly, lz);
+
 		if (!chunk) return block{};
 		if (nx < 0 || nx >= ChunkInfo::WIDTH ||
 			ny < 0 || ny >= ChunkInfo::HEIGHT ||
@@ -223,5 +245,7 @@ public:
 
 	Chunk(int x, int y, int z, PerlinNoise& generator);
 };
+
+
 
 #endif // !CHUNK_HPP

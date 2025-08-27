@@ -55,7 +55,7 @@ void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
 }
 
 void Chunks::processBoundaryBlock(
-    Chunk* A, Chunk* B,
+    const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
     int ax, int ay, int az,
     int bx, int by, int bz,
     std::array<bool, 4> &addedAny)
@@ -64,7 +64,6 @@ void Chunks::processBoundaryBlock(
     block bBlock = B->getBlock(bx, by, bz);
   
     // Если один из блоков непрозрачный для света (solid) — не передаём свет между ними
-    if (aBlock.id != 0 || bBlock.id != 0) return;
 
     for (int chan = 0; chan <= 3; ++chan) {
         unsigned char L_a = A->getBoundLight(ax, ay, az, chan);
@@ -91,7 +90,7 @@ void Chunks::processBoundaryBlock(
 }
 
 void Chunks::syncBoundaryWithNeigbour(
-    Chunk* chunk, Chunk* neighbor,
+    const std::shared_ptr<Chunk>& chunk, const std::shared_ptr<Chunk>& neighbor,
     int dir, std::array<bool, 4> &addedAny)
 {
     const int W = ChunkInfo::WIDTH;
@@ -120,7 +119,7 @@ void Chunks::syncBoundaryWithNeigbour(
     }
 }
 
-void Chunks::calculateLight(Chunk* chunk) {
+void Chunks::calculateLight(const std::shared_ptr<Chunk>& chunk) {
 	/*
 	for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
 		for (int z = 0; z < ChunkInfo::DEPTH; z++) {
@@ -135,20 +134,20 @@ void Chunks::calculateLight(Chunk* chunk) {
 		}
 	}*/
 
-	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-				block vox = chunk->getBlock(x, y, z);
-				if (vox.id != 0) {
-					break;
-				}
+        for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+            for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+                for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+                    block vox = chunk->getBlock(x, y, z);
+                    if (vox.id != 0) {
+                        break;
+                    }
+                    chunk->setLight(x, y, z, 3, 0xF);
+                }
+            }
+	    }
 
-					chunk->setLight(x, y, z, 3, 0xF);
-				
-			}
-		}
-	}
-
+    
+	
 	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
 		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
 			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
@@ -163,13 +162,12 @@ void Chunks::calculateLight(Chunk* chunk) {
 					chunk->getBoundLight(x, y+1, z, 3) == 0 ||
 					chunk->getBoundLight(x, y, z-1, 3) == 0 ||
 					chunk->getBoundLight(x, y, z+1, 3) == 0
-					) solverS->addLocally(x, y, z, chunk);
-
-					chunk->setLight(x, y, z, 3, 0xF);
-				
+					) solverS->addLocally(x, y, z, chunk);   
+				chunk->setLight(x, y, z, 3, 0xF);
 			}
 		}
 	}
+
 }
 
 
@@ -202,8 +200,8 @@ void Chunks::loadChunk(int x, int y, int z) {
     auto fut = threadPool.submit([this, pos]() {
         // 1) Создаём локальный unique_ptr (локальная владение пока)
     	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
+        sptr->weak_self = sptr;
 
-        // 2) Попытка вставить в map под эксклюзивным локом (double-check)
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
             auto it = chunkMap.find(pos);
@@ -216,12 +214,10 @@ void Chunks::loadChunk(int x, int y, int z) {
             }
         }
 
-        // 3) Теперь чанк гарантированно в chunkMap и owned -> безопасно читать map
-        //    Выполняем CPU-инициализацию под shared_lock (чтение соседей и т.д.)
         {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
             loadNeighbours(sptr);                     // читает chunkMap
-            calculateLight(sptr.get());                     // должна быть потокобезопасна при чтении соседей
+            calculateLight(sptr);                     // должна быть потокобезопасна при чтении соседей
 
             std::array<bool,4> addedAnyGlobal = {false,false,false,false};
             for (int face = 0; face < 6; ++face) {
@@ -229,29 +225,24 @@ void Chunks::loadChunk(int x, int y, int z) {
                 if (idx < 0) continue;
 
 				if (auto neigh_sp = sptr->neighbors[idx].lock()) {
-					syncBoundaryWithNeigbour(sptr.get(), neigh_sp.get(), face, addedAnyGlobal);
-                    readyChunks.push(neigh_sp);
-				}
+                    syncBoundaryWithNeigbour(sptr, neigh_sp, face, addedAnyGlobal);
+                    neigh_sp->modify();
+                }
             }
         }
-        solverS->solve();
-        // 4) (опционально) реши, где вызывать solverS->solve(): здесь — только если он потокобезопасен
-        
 
-        // 5) Помещаем готовый чанк в очередь для мэшера/рендера (map владеет объектом)
+        solverS->solve();
+        
         {
             std::lock_guard<std::mutex> ql(readyQueueMutex);
             readyChunks.push(sptr);
             readyCv.notify_one();
         }
 
-        // 6) Снять флаг loading
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
             loadingSet.erase(pos);
         }
-
-        // 7) Сигналим главный поток (notify_one достаточно)
         
     });
 
@@ -260,26 +251,24 @@ void Chunks::loadChunk(int x, int y, int z) {
 
 void Chunks::unloadChunk(int x, int y, int z) {
 	ChunkPos key{x,y,z};
-    std::shared_ptr<Chunk> sptr; // держим shared_ptr, пока чистим
+    std::shared_ptr<Chunk> sptr;
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         auto it = chunkMap.find(key);
         if (it == chunkMap.end()) return;
-        sptr = it->second; // копия shared_ptr, пока работаем с соседями
+        sptr = it->second;
     }
 
     for (int i = 0; i < 26; ++i) {
-    if (auto nbr = sptr->neighbors[i].lock()) {
-        int opp = 25 - i;
-        // захватываем оба одновременно, чтобы избежать дедлока
-        std::scoped_lock lock(sptr->dataMutex, nbr->dataMutex);
-        if (auto back = nbr->neighbors[opp].lock()) {
-            if (back.get() == sptr.get())
-                nbr->neighbors[opp].reset();
+        if (auto nbr = sptr->neighbors[i].lock()) {
+            int opp = 25 - i;
+            std::scoped_lock lock(sptr->dataMutex, nbr->dataMutex);
+            if (auto back = nbr->neighbors[opp].lock()) {
+                if (back.get() == sptr.get())
+                    nbr->neighbors[opp].reset();
+            }
         }
     }
-}
-
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);
@@ -323,7 +312,7 @@ unsigned char Chunks::getLight(int x, int y, int z, int channel) {
 	
 }
 
-Chunk* Chunks::getChunkByBlock(int x, int y, int z) {
+std::shared_ptr<Chunk> Chunks::getChunkByBlock(int x, int y, int z) {
 	{
 		std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
 
@@ -332,7 +321,7 @@ Chunk* Chunks::getChunkByBlock(int x, int y, int z) {
 		int cz = floorDiv(z, ChunkInfo::DEPTH);
 		auto it = chunkMap.find(ChunkPos{cx, cy, cz});
 		if (it == chunkMap.end()) return nullptr;
-		return it->second.get();
+		return it->second;
 	}
 }
 

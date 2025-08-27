@@ -66,17 +66,18 @@ void BlockRenderer::render() {
                 modified = chunk->isModified(); // если isModified читает atomic, то это тоже ок
             }
             
-            //if (modified) {
-            //    {
-            //        std::lock_guard lk(world->readyQueueMutex);
-            //        world->readyChunks.push(chunk);
-            //    }
-            //    {
-            //        std::unique_lock<std::shared_mutex> dl(chunk->dataMutex);
-            //        chunk->unmodify();
-            //    }
-            //    world->readyCv.notify_one();
-            //}
+            if (modified) {
+                {
+                    std::lock_guard lk(world->readyQueueMutex);
+                    world->readyChunks.push(chunk);
+                }
+                {
+                    std::unique_lock<std::shared_mutex> dl(chunk->dataMutex);
+                    chunk->unmodify();
+                    
+                    world->readyCv.notify_one();
+                }
+            }
 
             // нарисовать — только если mesh загружен
             Mesh* mesh = nullptr;

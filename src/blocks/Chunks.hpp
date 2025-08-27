@@ -96,16 +96,16 @@ class Chunks {
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	
 	void processBoundaryBlock(
-		Chunk* A, Chunk* B, 
+		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B, 
 		int ax, int ay, int az, 
 		int bx, int by, int bz, 
 		std::array<bool, 4> &addedAny);
 
 	void syncBoundaryWithNeigbour(
-		Chunk* chunk, Chunk* neighbor, 
+		const std::shared_ptr<Chunk>& chunk, const std::shared_ptr<Chunk>& neighbor, 
 		int dir, std::array<bool, 4> &addedAny);
 
-	void calculateLight(Chunk* chunk);
+	void calculateLight(const std::shared_ptr<Chunk>& chunk);
 	Chunk* generateChunk(int x, int y, int z);
 
 	void unloadChunk(int x, int y, int z);
@@ -123,7 +123,7 @@ public:
 
 	block getBlock(int x, int y, int z);
 	Chunk* getChunk(int x, int y, int z);
-	Chunk* getChunkByBlock(int x, int y, int z);
+	std::shared_ptr<Chunk> getChunkByBlock(int x, int y, int z);
 	unsigned char getLight(int x, int y, int z, int channel);
 	void set(int x, int y, int z, int id);
 
