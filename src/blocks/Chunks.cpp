@@ -71,7 +71,7 @@ void Chunks::processBoundaryBlock(
 
         if (L_b > L_a) {
             if (chan < 3) {
-                getSolver(chan)->addLocally(ax, ay, az, static_cast<int>(L_b), B);
+                getSolver(chan)->addLocally(ax, ay, az, static_cast<int>(L_b), A);
                 addedAny[chan] = true;
             } else {
                 solverS->addLocally(bx, by, bz, B);
@@ -82,7 +82,7 @@ void Chunks::processBoundaryBlock(
                 getSolver(chan)->addLocally(bx, by, bz, static_cast<int>(L_a), B);
                 addedAny[chan] = true;
             } else {
-                solverS->addLocally(ax, ay, az, B);
+                solverS->addLocally(ax, ay, az, A);
                 addedAny[3] = true;
             }
         }
@@ -336,14 +336,29 @@ Chunk* Chunks::getChunk(int x, int y, int z) {
 	}
 }
 
+bool insideRadius(const ivec3 &center, const ChunkPos &p, int radius) {
+    return (abs(center.x - p.x) <= radius) &&
+           (abs(center.y - p.y) <= radius) &&
+           (abs(center.z - p.z) <= radius);
+}
+
 void Chunks::update(const glm::dvec3 &playerPos) {
     generationFutures.erase(
     std::remove_if(generationFutures.begin(), generationFutures.end(),
                    [](std::future<void>& f){ return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; }),
     generationFutures.end());
+    
+    ivec3 playerChunk = worldToChunk3(playerPos);
 
-	ivec3 playerChunk = worldToChunk3(playerPos);
-
+    std::vector<ChunkPos> toUnload;
+    {
+        std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
+        for (auto& [pos, chunk] : chunkMap) {
+            if (!insideRadius(playerChunk, pos, loadDistance)) toUnload.push_back(pos);
+        }
+    }
+    for (auto& pos : toUnload) unloadChunk(pos.x, pos.y, pos.z);
+    
 	if (playerChunk != lastPlayerChunk) {
 		glm::ivec3 delta = playerChunk - lastPlayerChunk;
 
@@ -352,7 +367,6 @@ void Chunks::update(const glm::dvec3 &playerPos) {
 			int newX = playerChunk.x + delta.x * loadDistance;
 
 			for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
-				unloadChunk(oldX, 0, z);
 				loadChunk(newX, 0, z);
 			}
 		}
@@ -362,7 +376,6 @@ void Chunks::update(const glm::dvec3 &playerPos) {
 			int newZ = playerChunk.z + delta.z * loadDistance;
 
 			for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
-				unloadChunk(x, 0, oldZ);
 				loadChunk(x, 0, newZ);
 			}
 		}
