@@ -28,11 +28,14 @@
 
 #include "noise/PerlinNoise.hpp"
 
+#include "blocks/raycast/Raycasting.hpp"
+
 #include "glm/glm.hpp"
 #include "glm/ext.hpp"
 
 #include <chrono>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <filesystem>
 
@@ -64,15 +67,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	std::cout << 1 << '\n';
-
 	Chunks* world = new Chunks(5, 1, 5, true);
-
-	std::cout << 2 << '\n';
-
-	//Mesh** meshes = new Mesh * [world->volume];
-	//for (size_t i = 0; i < world->volume; i++)
-	//	meshes[i] = nullptr;
 
 	glClearColor(0.6f, 0.62f, 0.65f, 1);
 	
@@ -81,17 +76,6 @@ int main(int argc, char* argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	std::cout << 5 << '\n';
-
-	std::cout << 6 << '\n';
-	
-	//IMGUI_CHECKVERSION();
-	//ImGui::CreateContext();
-	//ImGuiIO& io = ImGui::GetIO(); (void)io;
-	//ImGui::StyleColorsDark();
-	//ImGui_ImplGlfw_InitForOpenGL(Window::window, true);
-	//ImGui_ImplOpenGL3_Init("#version 330");
-
 	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
 	
 	Frustum* frustum = new Frustum;
@@ -139,6 +123,17 @@ int main(int argc, char* argv[])
 			if (Events::pressed(GLFW_KEY_A)) {
 				camera->translate(-camera->xdir() * H * speed);
 			}
+			if (Events::jpressed(GLFW_KEY_K)) {
+				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
+				if(hit.hit) {
+					std::shared_ptr<Chunk> chunk = hit.chunk.lock();
+					{
+						std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
+						chunk->setBlock(hit.lx, hit.ly, hit.lz, 0);
+					}
+					world->lightSolver.removeLightLocally(hit.lx, hit.ly, hit.lz, chunk);
+				}
+			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {
 				camera->setydir(glm::dvec3(0, 1, 0));
 
@@ -171,14 +166,10 @@ int main(int argc, char* argv[])
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			camera->originRebase();
-
-			//ImGui_ImplOpenGL3_NewFrame();
-			//ImGui_ImplGlfw_NewFrame();
-			//ImGui::NewFrame();
 			
 			shader->use();
 
-			glm::mat4 projview = camera->getProjection() * camera->getView();
+			glm::mat4 projview = camera->getProjection() * camera->updateView();
 			
 			shader->uniformMatrix("projview", projview);
 			texture->bind();
@@ -186,12 +177,8 @@ int main(int argc, char* argv[])
 			world->update(camera->getPosition());
 
 			//frustum->update(projview);
+
 			drawContext.render();
-
-			//ImGui::ShowDemoWindow();
-
-			//ImGui::Render();
-			//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 			Window::swapBuffers();
 			Events::pullEvents();

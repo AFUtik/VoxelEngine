@@ -28,6 +28,12 @@
 class Chunk;
 struct block;
 
+inline glm::ivec3 worldToChunk3(glm::dvec3 pos) {
+    return { floorDiv(pos.x, ChunkInfo::WIDTH),
+             floorDiv(pos.y, ChunkInfo::HEIGHT),
+             floorDiv(pos.z, ChunkInfo::DEPTH) };
+}
+
 struct ChunkPos {
     int32_t x, y, z;
     bool operator==(const ChunkPos& o) const noexcept {
@@ -50,9 +56,22 @@ struct ChunkPosHash {
     }
 };
 
+struct ChunkPosLess {
+    bool operator()(const ChunkPos& a, const ChunkPos& b) const {
+        if (a.x != b.x) return a.x < b.x;
+        if (a.y != b.y) return a.y < b.y;
+        return a.z < b.z;
+    }
+};
+
 class Chunks {
 	PerlinNoise noise;
-	int loadDistance = 5;
+	int loadDistance = 10;
+	
+	std::queue<std::shared_ptr<Chunk>> readyChunks;
+	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
+
+	
 
 	/*
 	 * Used to find a chunk near player.
@@ -60,17 +79,7 @@ class Chunks {
 	
 	std::unordered_set<std::shared_ptr<Chunk>> readyChunksSet;
 
-	/*
-	 * Used to not close chunks and store them as compressed chunks using RLE algorithm.
-	 */
-	// std::unordered_map<uint64_t, std::unique_ptr<ChunkRLE>> rleChunkMap;
-
 	ivec3 lastPlayerChunk = ivec3(0.0);
-
-	LightSolver* solverR = nullptr;
-	LightSolver* solverG = nullptr;
-	LightSolver* solverB = nullptr;
-	LightSolver* solverS = nullptr;
 
 	// multithreading //
 
@@ -84,28 +93,9 @@ class Chunks {
 	std::unordered_set<ChunkPos, ChunkPosHash> loadingSet;
 	std::vector<std::future<void>> generationFutures;
 
-	LightSolver* Chunks::getSolver(int chan) {
-		switch(chan) {
-			case 0: return solverR;
-			case 1: return solverG;
-			default: return solverB;
-		}
-	}
-
 	// Neighbour methods //
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	
-	void processBoundaryBlock(
-		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B, 
-		int ax, int ay, int az, 
-		int bx, int by, int bz, 
-		std::array<bool, 4> &addedAny);
-
-	void syncBoundaryWithNeigbour(
-		const std::shared_ptr<Chunk>& chunk, const std::shared_ptr<Chunk>& neighbor, 
-		int dir, std::array<bool, 4> &addedAny);
-
-	void calculateLight(const std::shared_ptr<Chunk>& chunk);
 	Chunk* generateChunk(int x, int y, int z);
 
 	void unloadChunk(int x, int y, int z);
@@ -114,15 +104,12 @@ class Chunks {
 	friend class BlockRenderer;
 	friend class ChunkMesher;
 public:
-	std::queue<std::shared_ptr<Chunk>> readyChunks;
-	std::unordered_map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosHash> chunkMap;
-	
-	std::vector<Chunk*> iterable;
+	BasicLightSolver lightSolver;
 
 	Chunks(int w, int h, int d, bool lighting);
 
 	block getBlock(int x, int y, int z);
-	Chunk* getChunk(int x, int y, int z);
+	std::shared_ptr<Chunk> getChunk(int x, int y, int z);
 	std::shared_ptr<Chunk> getChunkByBlock(int x, int y, int z);
 	unsigned char getLight(int x, int y, int z, int channel);
 	void set(int x, int y, int z, int id);

@@ -23,6 +23,7 @@ class Camera {
 
 	float fov;
 	mat4 rotation;
+	mat4 view;
 	
 	dvec3 getRebaseShift();
 public:
@@ -45,7 +46,9 @@ public:
 	void rotate(float x, float y, float z);
 
 	mat4 getProjection();
-	mat4 getView();
+	const mat4& updateView();
+
+	vec3 getViewDir();
 	
 	inline const dvec3& getWorldShift() const {return accumulatedShift;};
 	void originRebase();

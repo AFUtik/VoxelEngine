@@ -106,9 +106,9 @@ static inline int faceToIdx(int face) {
 
 class Chunks;
 
-class Chunk : public std::enable_shared_from_this<Chunk> {
+class Chunk {
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
-	std::weak_ptr<Chunk> neighbors[26];
+	std::shared_ptr<Chunk> neighbors[26];
 	std::weak_ptr<Chunk> weak_self;
 	
 	std::unique_ptr<block[]> blocks;
@@ -126,7 +126,6 @@ public:
 	mutable std::shared_mutex dataMutex;
 	DrawableObject chunk_draw;
 
-	
 	inline void modify() { modified.store(true, std::memory_order_relaxed); }
 	inline void unmodify() { modified.store(false, std::memory_order_relaxed); }
 	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
@@ -166,7 +165,17 @@ public:
 		return NEI_INDEX_BY_ENCODE[ encode3(dx, dy, dz) ];
 	}
 
-	
+	inline Chunk* getNeigbourByFace(int face) {
+		int idx = faceToIdx(face);
+        if (idx < 0) return nullptr;
+
+		return neighbors[face].get();
+	}
+
+	inline const std::shared_ptr<Chunk>& getSharedNeigbourByFace(int face) {
+		return neighbors[faceToIdx(face)];
+	}
+
 	/*
 	 * Finds neighbour chunk of current chunk.
 	 * @param bx local
@@ -180,38 +189,7 @@ public:
 			return this;
 		}
 		int idx = getNeighbourIndex(bx, by, bz);
-		if (idx < 0 || idx >= 26) return nullptr;
-    	return neighbors[idx].lock().get();
-	}
-
-	/*
-	 * Finds neighbour chunk of current chunk.
-	 * @param lx local
-	 * @param ly local
-	 * @param lz local
-	 * @param out_x New local x
-	 * @param out_y New local y
-	 * @param out_z New local z
-	 */
-	inline Chunk* findNeighbourChunk(int lx, int ly, int lz, int &out_x, int &out_y, int &out_z) {
-		if (lx >= 0 && lx < ChunkInfo::WIDTH &&
-			ly >= 0 && ly < ChunkInfo::HEIGHT &&
-			lz >= 0 && lz < ChunkInfo::DEPTH) 
-		{
-			out_x = lx; out_y = ly; out_z = lz;
-			return this;
-		}
-		int idx = getNeighbourIndex(lx, ly, lz);
-		if (idx < 0 || idx >= 26) return nullptr;
-
-		Chunk* chunk = neighbors[idx].lock().get();
-    	if (!chunk) return nullptr;
-    	
-
-		out_x = lx - (chunk->x - x) * ChunkInfo::WIDTH;
-		out_y = ly - (chunk->y - y) * ChunkInfo::HEIGHT;
-		out_z = lz - (chunk->z - z) * ChunkInfo::DEPTH;
-		return chunk;
+    	return neighbors[idx].get();
 	}
 
 	inline block getBoundBlock(int32_t lx, int32_t ly, int32_t lz) {

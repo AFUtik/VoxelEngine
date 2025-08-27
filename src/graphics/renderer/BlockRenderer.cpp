@@ -26,17 +26,14 @@
 void BlockRenderer::render() {
     std::vector<std::shared_ptr<Chunk>> toUpload;
     {
-        std::lock_guard lk(mesher.meshUploadMutex); // короткий лок
+        std::lock_guard lk(mesher.meshUploadMutex);
         while (!mesher.meshUploadQueue.empty()) {
-            // предполагаем, что queue хранит std::shared_ptr<Chunk>
             auto& pr = mesher.meshUploadQueue.front();
             pr.second->chunk_draw.loadMesh(pr.first);
             toUpload.push_back(pr.second);
             mesher.meshUploadQueue.pop();
         }
     }
-
-    // --- 2) Выполним тяжелую работу (OpenGL upload) без удержания mutex'а
     
     for (auto &sp : toUpload) {
         if(!sp) continue;
@@ -59,11 +56,11 @@ void BlockRenderer::render() {
 	{
         std::shared_lock<std::shared_mutex> mapLock(world->chunkMapMutex);
         for (const auto& [chunkPos, chunk] : world->chunkMap) {
-
+            
             bool modified;
             {
                 std::shared_lock<std::shared_mutex> dl(chunk->dataMutex);
-                modified = chunk->isModified(); // если isModified читает atomic, то это тоже ок
+                modified = chunk->isModified();
             }
             
             if (modified) {
@@ -71,23 +68,18 @@ void BlockRenderer::render() {
                     std::lock_guard lk(world->readyQueueMutex);
                     world->readyChunks.push(chunk);
                 }
-                {
-                    std::unique_lock<std::shared_mutex> dl(chunk->dataMutex);
-                    chunk->unmodify();
-                    
-                    world->readyCv.notify_one();
-                }
+
+                chunk->unmodify();
+
+                world->readyCv.notify_one();
             }
 
-            // нарисовать — только если mesh загружен
-            Mesh* mesh = nullptr;
             {
-                std::shared_lock<std::shared_mutex> dl(chunk->chunk_draw.meshMutex);
-                mesh = chunk->chunk_draw.getMesh();
-                if (mesh == nullptr || !mesh->isUploaded()) continue;
-                
+                std::shared_lock<std::shared_mutex> dl(chunk->dataMutex);
+                Mesh* mesh = chunk->chunk_draw.getMesh();
+                if (mesh == nullptr || !mesh->isUploaded()) continue;  
             }
-            chunk->chunk_draw.draw(camera); // draw сам по себе должен быть потокобезопасен / в main thread с контекстом
+            chunk->chunk_draw.draw(camera);
         }
     }
 }

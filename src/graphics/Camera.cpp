@@ -35,8 +35,14 @@ mat4 Camera::getProjection() {
 	return glm::perspective(fov, aspect, 0.1f, 500.0f);
 }
 
-mat4 Camera::getView() {
-	return glm::lookAt(offsetPosition, offsetPosition + z_dir, y_dir);
+const mat4& Camera::updateView() {
+	view = glm::lookAt(offsetPosition, offsetPosition + z_dir, y_dir);
+	return view;
+}
+
+vec3 Camera::getViewDir() {
+	vec3 forward = -vec3(view[0][2], view[1][2], view[2][2]);
+    return glm::normalize(forward);
 }
 
 dvec3 Camera::getRebaseShift() {
