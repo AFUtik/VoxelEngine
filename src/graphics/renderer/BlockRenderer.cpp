@@ -25,26 +25,23 @@
 
 void BlockRenderer::render() {
     std::vector<std::shared_ptr<Chunk>> toUpload;
-
-    // --- 1. Сбор чанков для загрузки мешей ---
     {
         std::lock_guard lk(mesher.meshUploadMutex);
         while (!mesher.meshUploadQueue.empty()) {
-            auto pr = mesher.meshUploadQueue.front();
-            pr.second->chunk_draw.loadMesh(pr.first);
+            auto &pr = mesher.meshUploadQueue.front();
+            pr.second->chunk_draw.loadMesh(std::move(pr.first));
             toUpload.push_back(pr.second);
             mesher.meshUploadQueue.pop();
         }
     }
 
-    // --- 2. Обработка загруженных мешей ---
     for (auto &sp : toUpload) {
         if (!sp) continue;
 
-        std::shared_ptr<Mesh> mesh;
+        Mesh* mesh;
         {
             std::unique_lock<std::shared_mutex> lock(sp->dataMutex);
-            mesh = sp->chunk_draw.getSharedMesh(); // shared_ptr гарантирует жизнь объекта
+            mesh = sp->chunk_draw.getMesh();
             if (!mesh) continue;
 
             sp->chunk_draw.loadShader(shader);
@@ -54,11 +51,8 @@ void BlockRenderer::render() {
             double pz = double(sp->z) * double(ChunkInfo::DEPTH)  + 0.5;
             sp->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz));
 
-            if (!mesh->isUploaded())
-                mesh->upload_buffers();
+            if (!mesh->isUploaded()) mesh->upload_buffers();
         }
-        // draw можно вызвать без lock, если draw не модифицирует shared данные
-        sp->chunk_draw.draw(camera);
     }
 
     std::vector<std::shared_ptr<Chunk>> chunksToDraw;
@@ -67,16 +61,13 @@ void BlockRenderer::render() {
         for (const auto& [chunkPos, chunk] : world->chunkMap) {
             if (!chunk) continue;
 
-            bool modified = false;
-            std::shared_ptr<Mesh> mesh;
-
-            modified = chunk->isModified();
+            Mesh* mesh;
             {
                 std::shared_lock<std::shared_mutex> wl(chunk->dataMutex);
-                mesh = chunk->chunk_draw.getSharedMesh();
+                mesh = chunk->chunk_draw.getMesh();
             }
 
-            if (modified) {
+            if (chunk->isModified()) {
                 {
                     std::lock_guard lk(world->readyQueueMutex);
                     world->readyChunks.push(chunk);
@@ -85,12 +76,9 @@ void BlockRenderer::render() {
                 world->readyCv.notify_one();
             }
 
-            if (mesh && mesh->isUploaded()) {
-                chunksToDraw.push_back(chunk);
-            }
+            if (mesh && mesh->isUploaded()) chunksToDraw.push_back(chunk);
         }
     }
-
     for (auto &chunk : chunksToDraw) chunk->chunk_draw.draw(camera);
     
 }

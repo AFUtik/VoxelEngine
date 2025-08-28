@@ -59,6 +59,12 @@ public:
 
 class BasicLightSolver {
 	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
+
+	void processBoundaryBlockSingle(
+		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
+		int ax, int ay, int az,
+		int face,
+		std::array<bool,4> &addedAny);
 	
 	void processBoundaryBlock(
 		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
@@ -85,6 +91,12 @@ public:
 	 * @param chunk
 	 */
 	void propagateSunLight(const std::shared_ptr<Chunk>& chunk);
+
+	/*
+	 * Propagates light sun top to bottom.
+	 * @param chunk
+	 */
+	void propagateSunRay(int lx, int lz, const std::shared_ptr<Chunk>& chunk);
 
 	/*
 	 * Calculates light for chunks and neighbours around it.

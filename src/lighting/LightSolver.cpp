@@ -62,17 +62,12 @@ void LightSolver::remove(int x, int y, int z) {
 
 void LightSolver::removeLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk) {
 	if (!chunk) return;
-	
-	int light = chunk->getLight(lx, ly, lz, channel);
-	if (light == 0) return;
 
-	LightEntry entry{lx, ly, lz, static_cast<uint8_t>(light), chunk};
+	LightEntry entry{lx, ly, lz, 0, chunk};
 	{
 		std::unique_lock<std::shared_mutex> wlock(lightMutex);
 		remqueue.write(entry);
 	}
-
-	chunk->setLight(lx, ly, lz, channel, 0);
 }
 
 void LightSolver::solve() {
@@ -106,7 +101,8 @@ void LightSolver::solve() {
 					remqueue.write(nentry);
 					chunk->setLight(lx, ly, lz, channel, 0);
 				}
-				else if (light >= entry.light) {
+				
+				if (light >= entry.light) {
 					LightEntry nentry;
 					nentry.lx = lx;
 					nentry.ly = ly;
@@ -144,7 +140,7 @@ void LightSolver::solve() {
 			block v = chunk->getBlock(lx, ly, lz);
 			unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
 
-			if (v.id == 0 && static_cast<int>(curLight) + 2 <= entry.light) should_propagate = true;
+			if (v.id == 0 && static_cast<int>(curLight) + 1 < entry.light) should_propagate = true;
 			
 			if(should_propagate) {
 				chunk->setLight(lx, ly, lz, channel, entry.light - 1);
@@ -166,6 +162,44 @@ BasicLightSolver::BasicLightSolver(Chunks* chunks) :
 	solverG(new LightSolver(chunks, 2)), 
 	solverS(new LightSolver(chunks, 3)) {}
 
+void BasicLightSolver::processBoundaryBlockSingle(
+    const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
+    int ax, int ay, int az,
+    int face,
+    std::array<bool,4> &addedAny)
+{
+    // вычислим координаты в B
+    int bx = ax + FACE_DIRS[face][0];
+    int by = ay + FACE_DIRS[face][1];
+    int bz = az + FACE_DIRS[face][2];
+
+    block aBlock = A->getBlock(ax, ay, az);
+    block bBlock = B->getBlock(bx, by, bz);
+    if (aBlock.id != 0 || bBlock.id != 0) return;
+
+    for (int chan = 0; chan <= 3; ++chan) {
+        unsigned char L_a = A->getBoundLight(ax, ay, az, chan);
+        unsigned char L_b = B->getBoundLight(bx, by, bz, chan);
+
+        if (L_b > L_a) {
+            if (chan < 3) {
+                getSolver(chan)->addLocally(ax, ay, az, static_cast<int>(L_b), A);
+                addedAny[chan] = true;
+            } else {
+                solverS->addLocally(bx, by, bz, B);
+                addedAny[3] = true;
+            }
+        } else if (L_a > L_b) {
+            if (chan < 3) {
+                getSolver(chan)->addLocally(bx, by, bz, static_cast<int>(L_a), B);
+                addedAny[chan] = true;
+            } else {
+                solverS->addLocally(ax, ay, az, A);
+                addedAny[3] = true;
+            }
+        }
+    }
+}
 
 void BasicLightSolver::processBoundaryBlock(
     const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
@@ -282,6 +316,37 @@ void BasicLightSolver::propagateSunLight(const std::shared_ptr<Chunk>& chunk) {
 	}
 }
 
+void BasicLightSolver::propagateSunRay(int lx, int lz, const std::shared_ptr<Chunk>& chunk) {
+	{
+		std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
+		for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+			block vox = chunk->getBlock(lx, y, lz);
+			if (vox.id != 0) {
+				break;
+			}
+			chunk->setLight(lx, y, lz, 3, 0xF);
+		}
+
+		for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+			block vox = chunk->getBlock(lx, y, lz);
+			if (vox.id != 0) {
+				break;
+			}
+			if (
+				chunk->getBoundLight(lx-1, y, lz, 3) == 0 ||
+				chunk->getBoundLight(lx+1, y, lz, 3) == 0 ||
+				chunk->getBoundLight(lx, y-1, lz, 3) == 0 ||
+				chunk->getBoundLight(lx, y+1, lz, 3) == 0 ||
+				chunk->getBoundLight(lx, y, lz-1, 3) == 0 ||
+				chunk->getBoundLight(lx, y, lz+1, 3) == 0
+				) solverS->addLocally(lx, y, lz, chunk);   
+			chunk->setLight(lx, y, lz, 3, 0xF);
+		}
+			
+		
+	}
+}
+
 void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 	if(!solverS->addqueue.empty()) solverS->solve();
 
@@ -302,9 +367,25 @@ void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 
 void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk) {
 	solverS->removeLocally(lx, ly, lz, chunk);
-	calculateLight(chunk);
-	propagateSunLight(chunk);
 	solverS->solve();
 
-	chunk->modify();
+    std::array<bool,4> addedAny = {false,false,false,false};
+    for (int face = 0; face < 6; ++face) {
+        if (!isOnFace(lx, ly, lz, face)) continue;
+
+        auto& neighbour = chunk->getSharedNeigbourByFace(face);
+        if (!neighbour) continue;
+
+        syncBoundaryWithNeigbour(chunk, neighbour, face, addedAny);
+		neighbour->modify();
+    }
+
+    propagateSunRay(lx, lz, chunk);
+
+    if(addedAny[0]) solverR->solve();
+    if(addedAny[1]) solverG->solve();
+    if(addedAny[2]) solverB->solve();
+    solverS->solve();
+
+    chunk->modify();
 }

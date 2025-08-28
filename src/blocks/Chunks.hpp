@@ -66,7 +66,7 @@ struct ChunkPosLess {
 
 class Chunks {
 	PerlinNoise noise;
-	int loadDistance = 10;
+	int loadDistance = 3;
 	
 	std::queue<std::shared_ptr<Chunk>> readyChunks;
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;

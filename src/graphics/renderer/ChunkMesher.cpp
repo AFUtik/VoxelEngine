@@ -18,7 +18,7 @@ void ChunkMesher::meshWorkerThread() {
             }
             if(!sp) continue;
 
-            std::shared_ptr<Mesh> mesh;
+            std::unique_ptr<Mesh> mesh;
             {
                 std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
                 mesh = makeChunk(sp.get());
@@ -26,7 +26,7 @@ void ChunkMesher::meshWorkerThread() {
 
             {
                 std::lock_guard lk(meshUploadMutex);
-                meshUploadQueue.push({mesh, sp});
+                meshUploadQueue.push({std::move(mesh), sp});
             }
             meshUploadCv.notify_one();
         }

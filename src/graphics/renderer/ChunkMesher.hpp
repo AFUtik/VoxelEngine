@@ -32,7 +32,7 @@ class ChunkMesher {
 
     std::mutex meshUploadMutex;
 
-    std::queue<std::pair<std::shared_ptr<Mesh>, std::shared_ptr<Chunk>>> meshUploadQueue;
+    std::queue<std::pair<std::unique_ptr<Mesh>, std::shared_ptr<Chunk>>> meshUploadQueue;
 
     std::condition_variable meshUploadCv;
 
@@ -201,8 +201,8 @@ public:
         if (!cur_chunk->getBoundBlock(lx, ly, lz-1).id) makeFace<direction::SOUTH>(cur_chunk, consumer, lx, ly, lz, u1, v1, u2, v2); // SOUTH
     }
 
-    inline std::shared_ptr<Mesh> makeChunk(Chunk* chunk) {
-        auto mesh = std::make_shared<Mesh>();
+    inline std::unique_ptr<Mesh> makeChunk(Chunk* chunk) {
+        auto mesh = std::make_unique<Mesh>();
         VertexConsumer consumer = mesh->getConsumer();
         for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
             for (int z = 0; z < ChunkInfo::DEPTH; z++) {

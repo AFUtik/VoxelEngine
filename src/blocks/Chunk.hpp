@@ -104,6 +104,21 @@ static inline int faceToIdx(int face) {
     return -1;
 }
 
+inline bool isOnFace(int lx, int ly, int lz, int face) {
+    const int W = ChunkInfo::WIDTH;
+    const int H = ChunkInfo::HEIGHT;
+    const int D = ChunkInfo::DEPTH;
+    switch(face) {
+        case 0: return lz == D-1; // +Z
+        case 1: return lz == 0;   // -Z
+        case 2: return ly == H-1; // +Y
+        case 3: return ly == 0;   // -Y
+        case 4: return lx == W-1; // +X
+        case 5: return lx == 0;   // -X
+    }
+    return false;
+}
+
 class Chunks;
 
 class Chunk {
