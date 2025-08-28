@@ -126,12 +126,13 @@ int main(int argc, char* argv[])
 			if (Events::jpressed(GLFW_KEY_K)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
 				if(hit.hit) {
-					std::shared_ptr<Chunk> chunk = hit.chunk.lock();
-					{
-						std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
-						chunk->setBlock(hit.lx, hit.ly, hit.lz, 0);
+					if(auto chunk = hit.chunk.lock())  {
+						{
+							std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
+							chunk->setBlock(hit.lx, hit.ly, hit.lz, 0);
+						}
+						world->lightSolver.removeLightLocally(hit.lx, hit.ly, hit.lz, chunk);
 					}
-					world->lightSolver.removeLightLocally(hit.lx, hit.ly, hit.lz, chunk);
 				}
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {

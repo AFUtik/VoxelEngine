@@ -36,8 +36,10 @@ void Mesh::updateVBO(unsigned int offset, unsigned int amount) {
 }
 
 Mesh::~Mesh() {
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
+	if(uploaded) {
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+	}
 }
 
 void Mesh::draw(unsigned int primitive) const {

@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <structures/RingBuffer.hpp>
 
+#include <shared_mutex>
+
 class Chunks;
 class Chunk;
 
@@ -25,7 +27,11 @@ class LightSolver {
 	RingBuffer<LightEntry, MAX_LIGHT_UPDATES> remqueue;
 	Chunks* chunks;
 	int channel;
+
+	friend class BasicLightSolver;
 public:
+	mutable std::shared_mutex lightMutex;
+
 	LightSolver(Chunks* chunks, int channel);
 
 	/*

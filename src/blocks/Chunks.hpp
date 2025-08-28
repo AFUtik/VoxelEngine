@@ -71,8 +71,6 @@ class Chunks {
 	std::queue<std::shared_ptr<Chunk>> readyChunks;
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
 
-	
-
 	/*
 	 * Used to find a chunk near player.
 	 */

@@ -62,15 +62,13 @@ void Chunks::loadChunk(int x, int y, int z) {
         loadingSet.insert(pos);
     }
     auto fut = threadPool.submit([this, pos]() {
-        // 1) Создаём локальный unique_ptr (локальная владение пока)
     	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
         sptr->weak_self = sptr;
-
         {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-            loadNeighbours(sptr);                     // читает chunkMap
+            loadNeighbours(sptr);
         }
-        
+
         lightSolver.propagateSunLight(sptr);
         lightSolver.calculateLight(sptr);
         
@@ -105,22 +103,12 @@ void Chunks::unloadChunk(int x, int y, int z) {
 	ChunkPos key{x,y,z};
     std::shared_ptr<Chunk> sptr;
     {
-        std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+        std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
         auto it = chunkMap.find(key);
         if (it == chunkMap.end()) return;
         sptr = it->second;
     }
-
-    for (int i = 0; i < 26; ++i) {
-        if (auto nbr = sptr->neighbors[i]) {
-            int opp = 25 - i;
-            std::scoped_lock lock(sptr->dataMutex, nbr->dataMutex);
-            if (auto back = nbr->neighbors[opp]) {
-                if (back.get() == sptr.get())
-                    nbr->neighbors[opp].reset();
-            }
-        }
-    }
+    sptr->clearNeighbours();
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);

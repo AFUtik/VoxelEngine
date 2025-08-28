@@ -21,19 +21,21 @@ class Camera;
 
 class DrawableObject {
 protected:
-    std::unique_ptr<Mesh> mesh;
+    std::shared_ptr<Mesh> mesh;
     Transform transform;
-    
 public:
-    std::shared_mutex meshMutex;
+    mutable std::shared_mutex meshMutex;
     Shader* shader = nullptr;
     
     DrawableObject() : mesh(nullptr) {}
     
-    inline Mesh* getMesh() {return mesh.get();}
     inline Transform& getTransform() {return transform;}
 
-    void loadMesh(Mesh* mesh);
+    void loadMesh(std::shared_ptr<Mesh> mesh);
+    std::shared_ptr<Mesh> getSharedMesh();
+    
+    inline Mesh* getMesh() {return mesh.get();}
+
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {

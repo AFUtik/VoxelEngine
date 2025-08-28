@@ -126,6 +126,10 @@ public:
 	mutable std::shared_mutex dataMutex;
 	DrawableObject chunk_draw;
 
+	inline void clearNeighbours() {
+		for(int i = 0; i < 26; i++) neighbors[i].reset();
+	}
+
 	inline void modify() { modified.store(true, std::memory_order_relaxed); }
 	inline void unmodify() { modified.store(false, std::memory_order_relaxed); }
 	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }

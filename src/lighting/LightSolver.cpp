@@ -26,7 +26,11 @@ void LightSolver::addLocally(int x, int y, int z, uint8_t emission, const std::s
 	entry.lz = z;
 	entry.light = emission;
 	entry.chunk = chunk;
-	addqueue.write(entry);
+	
+	{
+		std::unique_lock<std::shared_mutex> wlock(lightMutex);
+		addqueue.write(entry);
+	}
 
 	// chunk->modified = true;
 	chunk->setLight(x, y, z, channel, entry.light);
@@ -58,17 +62,22 @@ void LightSolver::remove(int x, int y, int z) {
 
 void LightSolver::removeLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk) {
 	if (!chunk) return;
-
+	
 	int light = chunk->getLight(lx, ly, lz, channel);
 	if (light == 0) return;
 
 	LightEntry entry{lx, ly, lz, static_cast<uint8_t>(light), chunk};
-	remqueue.write(entry);
+	{
+		std::unique_lock<std::shared_mutex> wlock(lightMutex);
+		remqueue.write(entry);
+	}
 
 	chunk->setLight(lx, ly, lz, channel, 0);
 }
 
 void LightSolver::solve() {
+	std::unique_lock<std::shared_mutex> wlock(lightMutex);
+
 	while (!remqueue.empty()) {
 		LightEntry entry = remqueue.read();
 
@@ -132,13 +141,11 @@ void LightSolver::solve() {
 			Chunk::local(lx, ly, lz, x, y, z);
 
 			bool should_propagate = false;
-			{
-				std::shared_lock<std::shared_mutex> read(chunk->dataMutex);
-				block v = chunk->getBlock(lx, ly, lz);
-				unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
+			block v = chunk->getBlock(lx, ly, lz);
+			unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
 
-				if (v.id == 0 && static_cast<int>(curLight) + 2 <= entry.light) should_propagate = true;
-			}
+			if (v.id == 0 && static_cast<int>(curLight) + 2 <= entry.light) should_propagate = true;
+			
 			if(should_propagate) {
 				chunk->setLight(lx, ly, lz, channel, entry.light - 1);
 				LightEntry nentry;
@@ -273,17 +280,18 @@ void BasicLightSolver::propagateSunLight(const std::shared_ptr<Chunk>& chunk) {
 			}
 		}
 	}
-	
-
 }
 
 void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
+	if(!solverS->addqueue.empty()) solverS->solve();
+
 	std::array<bool,4> addedAnyGlobal = {false,false,false,false};
     for (int face = 0; face < 6; ++face) {
 		std::shared_ptr<Chunk> neigbour = chunk->getSharedNeigbourByFace(face);
 		if(!neigbour) continue;
 
-        syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
+		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
+	
         neigbour->modify();
     }
 	if(addedAnyGlobal[0]) solverR->solve();
@@ -295,6 +303,7 @@ void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk) {
 	solverS->removeLocally(lx, ly, lz, chunk);
 	calculateLight(chunk);
+	propagateSunLight(chunk);
 	solverS->solve();
 
 	chunk->modify();

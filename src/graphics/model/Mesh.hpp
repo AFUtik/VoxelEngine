@@ -9,7 +9,7 @@
 #include "../vertex/VertexConsumer.hpp"
 
 class Mesh {
-	std::unique_ptr<VertexBuffer> buffer;
+	std::shared_ptr<VertexBuffer> buffer;
 
 	bool uploaded = false;
 
@@ -17,7 +17,7 @@ class Mesh {
 	uint32_t vertices  = 0;
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
-	Mesh() : buffer(std::make_unique<VertexBuffer>()) {}
+	Mesh() : buffer(std::make_shared<VertexBuffer>()) {}
 	
 	~Mesh();
 

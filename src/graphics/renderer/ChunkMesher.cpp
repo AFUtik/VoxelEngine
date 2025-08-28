@@ -1,4 +1,5 @@
 #include "ChunkMesher.hpp"
+#include <memory>
 
 void ChunkMesher::meshWorkerThread() {
         while (true) {
@@ -16,15 +17,17 @@ void ChunkMesher::meshWorkerThread() {
                 
             }
             if(!sp) continue;
-                Mesh* mesh = nullptr;
-                {
-                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    mesh = makeChunk(sp.get());
-                }
-                {
-                    std::lock_guard lk(meshUploadMutex);
-                    meshUploadQueue.push({mesh, sp});
-                }
-                meshUploadCv.notify_one();   
+
+            std::shared_ptr<Mesh> mesh;
+            {
+                std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                mesh = makeChunk(sp.get());
+            }
+
+            {
+                std::lock_guard lk(meshUploadMutex);
+                meshUploadQueue.push({mesh, sp});
+            }
+            meshUploadCv.notify_one();
         }
     }
