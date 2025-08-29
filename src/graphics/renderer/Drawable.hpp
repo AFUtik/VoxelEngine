@@ -21,7 +21,7 @@ class Camera;
 
 class DrawableObject {
 protected:
-    std::unique_ptr<Mesh> mesh;
+    std::shared_ptr<Mesh> mesh;
     Transform transform;
 public:
     mutable std::shared_mutex meshMutex;
@@ -31,13 +31,14 @@ public:
     
     inline Transform& getTransform() {return transform;}
 
-    void loadMesh(std::unique_ptr<Mesh> mesh);
+    void loadMesh(const std::shared_ptr<Mesh> &mesh);
     inline Mesh* getMesh() {return mesh.get();}
+    inline std::shared_ptr<Mesh> getSharedMesh() {return mesh;}
 
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {
-        //if(!shader) return;
+        if(!shader) return;
 
         glUniformMatrix4fv(shader->model_loc, 1, GL_FALSE, glm::value_ptr(transform.model(camera)));
         mesh->draw(3);

@@ -355,8 +355,9 @@ void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 		std::shared_ptr<Chunk> neigbour = chunk->getSharedNeigbourByFace(face);
 		if(!neigbour) continue;
 
+
 		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
-	
+
         neigbour->modify();
     }
 	if(addedAnyGlobal[0]) solverR->solve();

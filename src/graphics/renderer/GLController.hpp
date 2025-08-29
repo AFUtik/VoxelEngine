@@ -23,9 +23,10 @@ class GlController {
 public:
     std::queue<gl_delete_cmd> glDelete;
     std::queue<gl_update_cmd> glUpdate;
-    std::queue<Mesh*> glUpload;
+    std::queue<std::shared_ptr<Mesh>> glUpload;
 
     std::mutex meshDeleteMutex;
+    std::mutex meshUpdateMutex;
     std::mutex meshUploadMutex;
 
     void processAll();

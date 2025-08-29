@@ -21,6 +21,8 @@ class Mesh {
 	uint32_t vertices  = 0;
 
 	friend class GlController;
+
+	friend class ChunkMesher;
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
 	Mesh(GlController* glController);
@@ -31,7 +33,7 @@ public:
 
 	inline VertexConsumer getConsumer() const {return VertexConsumer(buffer.get());}
 
-	void uploadBuffers();
+	void update();
 
 	void draw(unsigned int primitive) const;
 };

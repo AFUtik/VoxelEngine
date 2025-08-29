@@ -18,18 +18,27 @@ void ChunkMesher::meshWorkerThread() {
             }
             if(!sp) continue;
 
-            std::unique_ptr<Mesh> mesh;
-            {
-                std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                mesh = makeChunk(sp.get());
-            }
-            {
-                std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
-                sp->chunk_draw.loadMesh(std::move(mesh));
-            }
-            {
-                std::unique_lock<std::mutex> wlock(meshUploadMutex);
-                meshUploadQueue.push(sp);
+            if(sp->isModified()) {
+                std::shared_ptr<Mesh> mesh;
+                {
+                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                    mesh = makeChunk(sp.get());
+                }
+                {
+                    std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
+                    sp->chunk_draw.loadMesh(mesh);
+                }            
+                {
+                    std::unique_lock<std::mutex> wlock(meshUploadMutex);
+                    meshUploadQueue.push(sp);
+                }
+                sp->unmodify();
+            } else if(sp->isLightModified()) {
+                {
+                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                    updateChunk(sp.get());
+                } 
+                sp->unmodifyLight();
             }
             meshUploadCv.notify_one();
         }

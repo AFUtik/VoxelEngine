@@ -68,7 +68,6 @@ public:
     inline void allocate(const T& object) {
         if (free_head == -1) resize(capacity * 2);
 
-
         int index = free_head;
         free_head = next[free_head];
         data[index] = object;

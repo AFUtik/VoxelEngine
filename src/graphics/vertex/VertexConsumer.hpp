@@ -5,6 +5,7 @@
 
 class VertexConsumer {
 	VertexBuffer* buffer;
+	uint32_t index = 0;
 public:
     unsigned int ebo_index = 0;
 	unsigned int vbo_index = 0;
@@ -13,6 +14,10 @@ public:
 	VertexConsumer() : buffer(nullptr) {};
 
 	void vertex(const Vertex &vertex);
+	
+	void replaceLight(float r, float g, float b, float s);
+	void replaceUV   (float u, float v);
+	void replaceAll  (const Vertex &vertex);
 
     void endIndex();
 };

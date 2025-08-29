@@ -66,7 +66,7 @@ struct ChunkPosLess {
 
 class Chunks {
 	PerlinNoise noise;
-	int loadDistance = 3;
+	int loadDistance = 10;
 	
 	std::queue<std::shared_ptr<Chunk>> readyChunks;
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
@@ -93,7 +93,6 @@ class Chunks {
 
 	// Neighbour methods //
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
-	
 	Chunk* generateChunk(int x, int y, int z);
 
 	void unloadChunk(int x, int y, int z);

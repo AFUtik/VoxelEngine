@@ -8,15 +8,6 @@ Mesh::Mesh(GlController* glController) : glContoller(glController), buffer(std::
 
 }
 
-void Mesh::uploadBuffers() {
-	if(uploaded) return;
-	
-	{
-		std::lock_guard<std::mutex> lk(glContoller->meshUploadMutex);
-		glContoller->glUpload.push(this);
-	}
-}
-
 //void Mesh::updateVBO(unsigned int offset, unsigned int amount) {
 //	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 //	glBufferSubData(GL_ARRAY_BUFFER, offset * sizeof(Vertex), amount * sizeof(Vertex), buffer->vertices.get_data() + offset);
@@ -27,6 +18,15 @@ Mesh::~Mesh() {
 		{
 			std::lock_guard<std::mutex> lk(glContoller->meshDeleteMutex);
 			glContoller->glDelete.push({VAO, VBO});
+		}
+	}
+}
+
+void Mesh::update() {
+	if(uploaded) {
+		{
+			std::lock_guard<std::mutex> lk(glContoller->meshUpdateMutex);
+			glContoller->glUpdate.push({VBO, buffer->vertices.get_size(), buffer->vertices.get_data()});
 		}
 	}
 }

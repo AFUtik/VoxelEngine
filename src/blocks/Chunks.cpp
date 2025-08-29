@@ -68,7 +68,7 @@ void Chunks::loadChunk(int x, int y, int z) {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
             loadNeighbours(sptr);
         }
-
+        
         lightSolver.propagateSunLight(sptr);
         lightSolver.calculateLight(sptr);
         

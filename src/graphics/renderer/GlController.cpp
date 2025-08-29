@@ -16,12 +16,31 @@ void GlController::processAll() {
     }
 
     {
+        std::lock_guard<std::mutex> lk(meshUpdateMutex);
+        if (!glUpdate.empty()) {
+            gl_update_cmd pr = glUpdate.front();
+            glUpdate.pop();
+
+            size_t size = sizeof(float) * VERTEX_SIZE * pr.vertex_count;
+
+            glBindBuffer(GL_ARRAY_BUFFER, pr.vbo);
+            void* ptr = glMapBufferRange(
+                GL_ARRAY_BUFFER,
+                0, size,
+                GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT
+            );
+            memcpy(ptr, pr.vertices, size);
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+        }
+    }
+
+    {
         std::lock_guard<std::mutex> lk(meshUploadMutex);
         while (!glUpload.empty()) {
-            Mesh *mesh = glUpload.front();
+            auto mesh = glUpload.front();
             glUpload.pop();
-            
-            if (mesh->uploaded) continue;
+
+            if(!mesh || mesh->uploaded) continue;
 
             mesh->vertices = mesh->buffer->vertices.get_size();
 

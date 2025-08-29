@@ -32,7 +32,8 @@ class Chunk {
 	friend class ChunkMesher;
 	friend class LightSolver;
 
-	std::atomic<bool> modified{false};
+	std::atomic<bool> modified{true};
+	std::atomic<bool> lightModified{false};
 
 	Chunks* world;
 public:
@@ -43,10 +44,18 @@ public:
 		for(int i = 0; i < 26; i++) neighbors[i].reset();
 	}
 
+	
+
+	inline void modifyLight() { lightModified.store(true, std::memory_order_relaxed); }
+	inline void unmodifyLight() { lightModified.store(false, std::memory_order_relaxed); }
+	inline bool isLightModified() const { return lightModified.load(std::memory_order_relaxed); }
+	
 	inline void modify() { modified.store(true, std::memory_order_relaxed); }
-	inline void unmodify() { modified.store(false, std::memory_order_relaxed); }
+	inline void unmodify() { 
+		modified.store(false, std::memory_order_relaxed); 
+		lightModified.store(false, std::memory_order_relaxed);
+	}
 	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
-	inline bool test_and_clear_modified() { return modified.exchange(false, std::memory_order_acq_rel); }
 
 	// World Pos //
 	int32_t x, y, z;

@@ -190,18 +190,9 @@ int main(int argc, char* argv[])
         	std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
 		}
 	}
-	//ImGui_ImplOpenGL3_Shutdown();
-	//ImGui_ImplGlfw_Shutdown();
-	//ImGui::DestroyContext();
-
 	delete texture;
 	delete shader;
 	delete frustum;
-
-	// delete solverR;
-	// delete solverG;
-	// delete solverB;
-	// delete solverS;
 
 	delete camera;
 	delete world;
