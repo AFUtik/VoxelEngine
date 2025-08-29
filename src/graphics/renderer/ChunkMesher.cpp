@@ -23,10 +23,13 @@ void ChunkMesher::meshWorkerThread() {
                 std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
                 mesh = makeChunk(sp.get());
             }
-
             {
-                std::lock_guard lk(meshUploadMutex);
-                meshUploadQueue.push({std::move(mesh), sp});
+                std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
+                sp->chunk_draw.loadMesh(std::move(mesh));
+            }
+            {
+                std::unique_lock<std::mutex> wlock(meshUploadMutex);
+                meshUploadQueue.push(sp);
             }
             meshUploadCv.notify_one();
         }

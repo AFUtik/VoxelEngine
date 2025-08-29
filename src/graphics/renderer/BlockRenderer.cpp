@@ -29,30 +29,24 @@ void BlockRenderer::render() {
         std::lock_guard lk(mesher.meshUploadMutex);
         while (!mesher.meshUploadQueue.empty()) {
             auto &pr = mesher.meshUploadQueue.front();
-            pr.second->chunk_draw.loadMesh(std::move(pr.first));
-            toUpload.push_back(pr.second);
+            toUpload.push_back(pr);
             mesher.meshUploadQueue.pop();
         }
     }
 
+    mesher.glController->processAll();
+
     for (auto &sp : toUpload) {
         if (!sp) continue;
+        
+        Mesh* mesh = sp->chunk_draw.getMesh();
+        if (!mesh) continue;
 
-        Mesh* mesh;
-        {
-            std::unique_lock<std::shared_mutex> lock(sp->dataMutex);
-            mesh = sp->chunk_draw.getMesh();
-            if (!mesh) continue;
-
-            sp->chunk_draw.loadShader(shader);
-
-            double px = double(sp->x) * double(ChunkInfo::WIDTH)  + 0.5;
-            double py = double(sp->y) * double(ChunkInfo::HEIGHT) + 0.5;
-            double pz = double(sp->z) * double(ChunkInfo::DEPTH)  + 0.5;
-            sp->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz));
-
-            if (!mesh->isUploaded()) mesh->upload_buffers();
-        }
+        sp->chunk_draw.loadShader(shader);
+        double px = double(sp->x) * double(ChunkInfo::WIDTH)  + 0.5;
+        double py = double(sp->y) * double(ChunkInfo::HEIGHT) + 0.5;
+        double pz = double(sp->z) * double(ChunkInfo::DEPTH)  + 0.5;
+        sp->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz)); 
     }
 
     std::vector<std::shared_ptr<Chunk>> chunksToDraw;

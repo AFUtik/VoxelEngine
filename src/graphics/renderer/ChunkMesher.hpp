@@ -12,10 +12,14 @@
 #include "../../blocks/Chunks.hpp"
 #include "../../blocks/ChunkInfo.hpp"
 #include "../../blocks/Chunk.hpp"
-#include "structures/ThreadPool.hpp"
+#include "../model/Mesh.hpp"
+
+#include "GLController.hpp"
 
 #include <memory>
 #include <mutex>
+
+class Mesher;
 
 using namespace glm;
 
@@ -28,11 +32,12 @@ static const int Dirs[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0
 static const float Normals[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0}};
 
 class ChunkMesher {
+    std::unique_ptr<GlController> glController;
     Chunks* world; 
 
     std::mutex meshUploadMutex;
 
-    std::queue<std::pair<std::unique_ptr<Mesh>, std::shared_ptr<Chunk>>> meshUploadQueue;
+    std::queue<std::shared_ptr<Chunk>> meshUploadQueue;
 
     std::condition_variable meshUploadCv;
 
@@ -170,7 +175,7 @@ class ChunkMesher {
 
     friend class BlockRenderer; 
 public:
-    ChunkMesher(Chunks* world) : world(world) {
+    ChunkMesher(Chunks* world) : glController(new GlController), world(world) {
         worker = std::thread([this, world] { meshWorkerThread(); });
     }
 
@@ -202,7 +207,7 @@ public:
     }
 
     inline std::unique_ptr<Mesh> makeChunk(Chunk* chunk) {
-        auto mesh = std::make_unique<Mesh>();
+        auto mesh = std::make_unique<Mesh>(glController.get());
         VertexConsumer consumer = mesh->getConsumer();
         for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
             for (int z = 0; z < ChunkInfo::DEPTH; z++) {
@@ -215,6 +220,7 @@ public:
                 }
             }
         }
+        mesh->uploadBuffers();
         return mesh;
     }
 

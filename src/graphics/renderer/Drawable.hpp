@@ -37,6 +37,8 @@ public:
     inline void loadShader(Shader* shader) {this->shader = shader;}
 
     virtual void draw(Camera* camera) {
+        //if(!shader) return;
+
         glUniformMatrix4fv(shader->model_loc, 1, GL_FALSE, glm::value_ptr(transform.model(camera)));
         mesh->draw(3);
     };

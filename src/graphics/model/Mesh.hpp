@@ -8,28 +8,32 @@
 
 #include "../vertex/VertexConsumer.hpp"
 
+class GlController;
+
 class Mesh {
+	GlController* glContoller;
+
 	std::shared_ptr<VertexBuffer> buffer;
 
 	bool uploaded = false;
 
 	uint32_t VBO, VAO;
 	uint32_t vertices  = 0;
+
+	friend class GlController;
 public:
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
-	Mesh() : buffer(std::make_shared<VertexBuffer>()) {}
-	
+	Mesh(GlController* glController);
+
 	~Mesh();
 
 	inline bool isUploaded() {return uploaded;}
 
 	inline VertexConsumer getConsumer() const {return VertexConsumer(buffer.get());}
 
-	void upload_buffers();
+	void uploadBuffers();
 
 	void draw(unsigned int primitive) const;
-	
-	void updateVBO(unsigned int offset, unsigned int amount);
 };
 
 #endif /* GRAPHICS_MESH_H_ */

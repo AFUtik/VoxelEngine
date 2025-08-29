@@ -10,9 +10,9 @@ class Frustum;
 
 #include "ChunkMesher.hpp"
 #include "Renderer.hpp"
+#include "GlController.hpp"
 
 class BlockRenderer : public Renderer {
-	
 	Chunks* world;
 public:
 	ChunkMesher mesher;
