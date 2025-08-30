@@ -19,6 +19,8 @@ using namespace glm;
 #include <limits.h>
 #include "ChunkRLE.hpp"
 
+#include "../lighting/LightCompressor.hpp"
+
 Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), threadPool(1), lightSolver(this)  {
 	noise.octaves = 2;
 }
@@ -69,8 +71,21 @@ void Chunks::loadChunk(int x, int y, int z) {
             loadNeighbours(sptr);
         }
         
+        RGBS_compression compression;
+        
         lightSolver.propagateSunLight(sptr);
+        
+        {
+            std::unique_lock<std::shared_mutex> wlock(sptr->dataMutex);
+            LightCompressor::compress(sptr->lightmap.get(), compression);
+            LightCompressor::decompress(sptr->lightmap.get(), compression);
+        }
+
         lightSolver.calculateLight(sptr);
+        
+        //lightSolver.calculateLight(sptr);
+
+        std::cout << "org: " << (65536*2.0f)/(1024*1024) << " mb | " << (compression[3].size() * 4.0f)/(1024*1024) << " mb" << std::endl;
         
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
