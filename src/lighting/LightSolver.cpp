@@ -2,7 +2,7 @@
 #include "LightMap.hpp"
 #include "../blocks/Chunks.hpp"
 #include "../blocks/Chunk.hpp"
-#include "../blocks/Block.hpp"
+#include "../blocks/Block.hpp" 
 
 #include <iostream>
 #include <memory>
@@ -70,7 +70,7 @@ void LightSolver::removeLocally(int lx, int ly, int lz, const std::shared_ptr<Ch
 	}
 }
 
-void LightSolver::solve() {
+void LightSolver::solve(bool (&neigbours_dirty)[26]) {
 	std::unique_lock<std::shared_mutex> wlock(lightMutex);
 
 	while (!remqueue.empty()) {
@@ -90,25 +90,20 @@ void LightSolver::solve() {
 				int lx, ly, lz;
 				Chunk::local(lx, ly, lz, x, y, z);
 
-				int light = chunk->getLight(lx, ly, lz, channel);
+				uint8_t light = chunk->getLight(lx, ly, lz, channel);
 				if (light != 0 && light == entry.light - 1) {
-					LightEntry nentry;
-					nentry.lx = lx;
-					nentry.ly = ly;
-					nentry.lz = lz;
-					nentry.light = light;
-					nentry.chunk = chunk->weak_self;
+					LightEntry nentry{lx, ly, lz, light, chunk->weak_self};
+
+					if(!inBounds(x, y, z)) neigbours_dirty[coordsIntoNeighInd(x, y, z)]=true;
+
 					remqueue.write(nentry);
 					chunk->setLight(lx, ly, lz, channel, 0);
 				}
-				
-				if (light >= entry.light) {
-					LightEntry nentry;
-					nentry.lx = lx;
-					nentry.ly = ly;
-					nentry.lz = lz;
-					nentry.light = light;
-					nentry.chunk = chunk->weak_self;
+				else if (light >= entry.light) {
+					LightEntry nentry{lx, ly, lz, light, chunk->weak_self};
+
+					if(!inBounds(x, y, z)) neigbours_dirty[coordsIntoNeighInd(x, y, z)]=true;
+
 					addqueue.write(nentry);
 				}
 			}
@@ -141,15 +136,23 @@ void LightSolver::solve() {
 			unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
 
 			if (v.id == 0 && static_cast<int>(curLight) + 1 < entry.light) should_propagate = true;
+
+			
 			
 			if(should_propagate) {
 				chunk->setLight(lx, ly, lz, channel, entry.light - 1);
-				LightEntry nentry;
-				nentry.lx = lx;
-				nentry.ly = ly;
-				nentry.lz = lz;
-				nentry.light = entry.light - 1;
-				nentry.chunk = chunk->weak_self;
+				uint8_t nl = entry.light-1;
+				LightEntry nentry{lx, ly, lz, nl, chunk->weak_self};
+
+				if(!inBounds(x, y, z)) {
+					neigbours_dirty[coordsIntoNeighInd(x, y, z)]=true;
+				} 
+				else if(onBorders(x, y, z)) {
+					int cx = (x == 0) ? -1 : (x == ChunkInfo::WIDTH  - 1)  ? 1 : 0;
+					int cy = (y == 0) ? -1 : (y == ChunkInfo::HEIGHT - 1)  ? 1 : 0;
+					int cz = (z == 0) ? -1 : (z == ChunkInfo::DEPTH  - 1)  ? 1 : 0;
+					neigbours_dirty[neighbourIndexFromDelta(cx, cy, cz)] = true;
+				}
 				addqueue.write(nentry);
 			}
 		}
@@ -348,27 +351,34 @@ void BasicLightSolver::propagateSunRay(int lx, int lz, const std::shared_ptr<Chu
 }
 
 void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
-	if(!solverS->addqueue.empty()) solverS->solve();
-
 	std::array<bool,4> addedAnyGlobal = {false,false,false,false};
     for (int face = 0; face < 6; ++face) {
 		std::shared_ptr<Chunk> neigbour = chunk->getSharedNeigbourByFace(face);
 		if(!neigbour) continue;
 
-
 		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
-
-        neigbour->modify();
+		neigbour->modify();
     }
-	if(addedAnyGlobal[0]) solverR->solve();
-	if(addedAnyGlobal[1]) solverG->solve();
-	if(addedAnyGlobal[2]) solverB->solve();
-	if(addedAnyGlobal[3]) solverS->solve();
+
+	bool neighbours[26] {false};
+
+	solverR->solve(neighbours);
+	solverG->solve(neighbours);
+	solverB->solve(neighbours);
+	solverS->solve(neighbours);
+
+	for(int i = 0; i < 26; i++)
+		if(neighbours[i]) {
+			auto &neigh = chunk->getNeigbour(i);
+			if(neigh) neigh->modify();
+		}
 }
 
 void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk) {
+	bool neighbours[26] {false};
+
 	solverS->removeLocally(lx, ly, lz, chunk);
-	solverS->solve();
+	solverS->solve(neighbours);
 
     std::array<bool,4> addedAny = {false,false,false,false};
     for (int face = 0; face < 6; ++face) {
@@ -383,10 +393,15 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::sha
 
     propagateSunRay(lx, lz, chunk);
 
-    if(addedAny[0]) solverR->solve();
-    if(addedAny[1]) solverG->solve();
-    if(addedAny[2]) solverB->solve();
-    solverS->solve();
+    if(addedAny[0]) solverR->solve(neighbours);
+    if(addedAny[1]) solverG->solve(neighbours);
+    if(addedAny[2]) solverB->solve(neighbours);
+    if(addedAny[3]) solverS->solve(neighbours);
 
-    chunk->modify();
+	chunk->modify();
+	for(int i = 0; i < 26; i++)
+		if(neighbours[i]) {
+			auto &neigh = chunk->getNeigbour(i);
+			if(neigh) neigh->modify();
+		}
 }

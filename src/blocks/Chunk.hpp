@@ -10,6 +10,8 @@
 #include "../noise/PerlinNoise.hpp"
 #include "../graphics/renderer/Drawable.hpp"
 
+#include "ChunkCompressor.hpp"
+#include "ChunkInfo.hpp"
 #include "chunk_utils.hpp"
 #include "RenderInfo.hpp"
 
@@ -28,7 +30,7 @@ class Chunk {
 	std::unique_ptr<Lightmap> lightmap;
 
 	friend class Chunks;
-	friend class ChunkRLE;
+	friend class ChunkCompressor;
 	friend class ChunkMesher;
 	friend class LightSolver;
 
@@ -62,7 +64,7 @@ public:
 	glm::vec3 min;
 	glm::vec3 max;
 
-	Chunk(int x, int y, int z) : x(x), y(y), z(z) {}
+	Chunk(int x, int y, int z) : x(x), y(y), z(z), blocks(new block[ChunkInfo::VOLUME]), lightmap(new Lightmap) {}
 	
 	/*
 	 * Transforms global coordinates into local coords.
@@ -80,6 +82,10 @@ public:
 		gx = x + chunk->x * ChunkInfo::WIDTH;
 		gy = y + chunk->y * ChunkInfo::HEIGHT;
 		gz = z + chunk->z * ChunkInfo::DEPTH;
+	}
+
+	inline const std::shared_ptr<Chunk>& getNeigbour(int ind) {
+		return neighbors[ind];
 	}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {

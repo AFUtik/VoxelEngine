@@ -16,7 +16,7 @@
 
 Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
 	lightmap(new Lightmap),
-	blocks(std::make_unique<block[]>(ChunkInfo::ChunkInfo::VOLUME)),
+	blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)),
 	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
 	max(x*ChunkInfo::WIDTH+ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH+ChunkInfo::DEPTH),
 	x(x), y(y), z(z) {

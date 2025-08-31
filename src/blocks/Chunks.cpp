@@ -17,7 +17,7 @@ using namespace glm;
 
 #include <math.h>
 #include <limits.h>
-#include "ChunkRLE.hpp"
+#include "ChunkCompressor.hpp"
 
 #include "../lighting/LightCompressor.hpp"
 
@@ -57,12 +57,32 @@ void Chunks::loadChunk(int x, int y, int z) {
         std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
         if (chunkMap.find(pos) != chunkMap.end()) return;
     }
-
+    std::shared_ptr<Chunk> decompressed;
     {
-        std::unique_lock<std::shared_mutex> ul(chunkMapMutex);
+        std::shared_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
+
+        auto it = comprsChunkMap.find(pos);
+        if (it != comprsChunkMap.end()) decompressed = ChunkCompressor::decompress(it->second);
+    }
+    if(decompressed) {
+        {
+            std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
+            loadNeighbours(decompressed);
+        }
+        //lightSolver.calculateLight(decompressed);
+        {
+            std::unique_lock<std::shared_mutex> wl(chunkMapMutex);
+            chunkMap.emplace(pos, decompressed);
+            return;
+        }
+    }
+    
+    {
+        std::unique_lock<std::mutex> ls(loadingSetMutex);
         if (loadingSet.find(pos) != loadingSet.end()) return;
         loadingSet.insert(pos);
     }
+
     auto fut = threadPool.submit([this, pos]() {
     	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
         sptr->weak_self = sptr;
@@ -71,21 +91,9 @@ void Chunks::loadChunk(int x, int y, int z) {
             loadNeighbours(sptr);
         }
         
-        RGBS_compression compression;
-        
+
         lightSolver.propagateSunLight(sptr);
-        
-        {
-            std::unique_lock<std::shared_mutex> wlock(sptr->dataMutex);
-            LightCompressor::compress(sptr->lightmap.get(), compression);
-            LightCompressor::decompress(sptr->lightmap.get(), compression);
-        }
-
         lightSolver.calculateLight(sptr);
-        
-        //lightSolver.calculateLight(sptr);
-
-        std::cout << "org: " << (65536*2.0f)/(1024*1024) << " mb | " << (compression[3].size() * 4.0f)/(1024*1024) << " mb" << std::endl;
         
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
@@ -105,12 +113,10 @@ void Chunks::loadChunk(int x, int y, int z) {
         }
 
         {
-            std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+            std::unique_lock<std::mutex> ls(loadingSetMutex);
             loadingSet.erase(pos);
         }
-        
     });
-
     generationFutures.emplace_back(std::move(fut));
 }
 
@@ -127,6 +133,11 @@ void Chunks::unloadChunk(int x, int y, int z) {
     {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);
+    }
+    std::shared_ptr<ChunkCompressed> compressed = ChunkCompressor::compress(sptr);
+    {
+        std::unique_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
+        comprsChunkMap[key] = compressed;
     }
 }
 
@@ -198,10 +209,7 @@ bool insideRadius(const ivec3 &center, const ChunkPos &p, int radius) {
 }
 
 void Chunks::update(const glm::dvec3 &playerPos) {
-    generationFutures.erase(
-    std::remove_if(generationFutures.begin(), generationFutures.end(),
-                   [](std::future<void>& f){ return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; }),
-    generationFutures.end());
+    //generationFutures
     
     ivec3 playerChunk = worldToChunk3(playerPos);
 

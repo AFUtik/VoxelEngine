@@ -54,7 +54,7 @@ public:
 
 	void removeLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
 
-	void solve();
+	void solve(bool (&neigbours_dirty)[26]);
 };
 
 class BasicLightSolver {
@@ -103,8 +103,8 @@ public:
 	 */
 	void calculateLight(const std::shared_ptr<Chunk>& chunk);
 
-
 	void removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
+	void placeLightLocally (int lx, int ly, int lz, uint8_t emission, const std::shared_ptr<Chunk> &chunk);
 };
 
 #endif /* LIGHTSOLVER_HPP */

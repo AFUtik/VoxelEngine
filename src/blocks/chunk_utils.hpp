@@ -108,4 +108,35 @@ inline bool isOnFace(int lx, int ly, int lz, int face) {
     return false;
 }
 
+inline int coordsIntoNeighInd(int lx, int ly, int lz) {
+    int dx = 0, dy = 0, dz = 0;
+
+    if      (lx < 0)                  dx = -1;
+    else if (lx >= ChunkInfo::WIDTH)  dx =  1;
+
+    if      (ly < 0)                   dy = -1;
+    else if (ly >= ChunkInfo::HEIGHT)  dy =  1;
+
+    if      (lz < 0)                  dz = -1;
+    else if (lz >= ChunkInfo::DEPTH)  dz =  1;
+
+    return NEI_INDEX_BY_ENCODE[ encode3(dx, dy, dz)];
+}
+
+inline bool inBounds(int x, int y, int z) noexcept {
+    return  (unsigned)x < ChunkInfo::WIDTH  &&
+            (unsigned)y < ChunkInfo::HEIGHT &&
+            (unsigned)z < ChunkInfo::DEPTH;
+}
+
+inline bool onBorders(int x, int y, int z) noexcept {
+    return (unsigned)x == ChunkInfo::WIDTH  - 1  || 
+           (unsigned)y == ChunkInfo::HEIGHT - 1  || 
+           (unsigned)z == ChunkInfo::DEPTH  - 1;
+}
+
+inline int neighbourIndexFromDelta(int dx, int dy, int dz) noexcept {
+    return NEI_INDEX_BY_ENCODE[encode3(dx, dy, dz)];
+}
+
 #endif 

@@ -24,6 +24,7 @@
 
 #include "../lighting/LightSolver.hpp"
 #include "../noise/PerlinNoise.hpp"
+#include "ChunkCompressor.hpp"
 
 class Chunk;
 struct block;
@@ -66,22 +67,27 @@ struct ChunkPosLess {
 
 class Chunks {
 	PerlinNoise noise;
-	int loadDistance = 10;
+	int loadDistance = 5;
 	
 	std::queue<std::shared_ptr<Chunk>> readyChunks;
+
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
+	mutable std::shared_mutex chunkMapMutex;
+
+	std::map<ChunkPos, std::shared_ptr<ChunkCompressed>, ChunkPosLess> comprsChunkMap;
+	mutable std::shared_mutex comprsChunkMapMutex;
 
 	/*
 	 * Used to find a chunk near player.
 	 */
-	
 	std::unordered_set<std::shared_ptr<Chunk>> readyChunksSet;
+	mutable std::mutex loadingSetMutex;
 
 	ivec3 lastPlayerChunk = ivec3(0.0);
 
 	// multithreading //
 
-	mutable std::shared_mutex chunkMapMutex;
+	
 	ThreadPool threadPool;
 
 	std::mutex readyQueueMutex;
