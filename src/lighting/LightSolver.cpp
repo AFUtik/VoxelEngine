@@ -136,8 +136,6 @@ void LightSolver::solve(bool (&neigbours_dirty)[26]) {
 			unsigned char curLight = chunk->getLight(lx, ly, lz, channel);
 
 			if (v.id == 0 && static_cast<int>(curLight) + 1 < entry.light) should_propagate = true;
-
-			
 			
 			if(should_propagate) {
 				chunk->setLight(lx, ly, lz, channel, entry.light - 1);
@@ -357,7 +355,7 @@ void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 		if(!neigbour) continue;
 
 		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
-		neigbour->modify();
+		neigbour->makeDirty();
     }
 
 	bool neighbours[26] {false};
@@ -370,7 +368,7 @@ void BasicLightSolver::calculateLight(const std::shared_ptr<Chunk> &chunk) {
 	for(int i = 0; i < 26; i++)
 		if(neighbours[i]) {
 			auto &neigh = chunk->getNeigbour(i);
-			if(neigh) neigh->modify();
+			if(neigh) neigh->makeDirty();
 		}
 }
 
@@ -388,7 +386,7 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::sha
         if (!neighbour) continue;
 
         syncBoundaryWithNeigbour(chunk, neighbour, face, addedAny);
-		neighbour->modify();
+		neighbour->makeDirty();
     }
 
     propagateSunRay(lx, lz, chunk);
@@ -398,10 +396,10 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::sha
     if(addedAny[2]) solverB->solve(neighbours);
     if(addedAny[3]) solverS->solve(neighbours);
 
-	chunk->modify();
+	chunk->makeDirty();
 	for(int i = 0; i < 26; i++)
 		if(neighbours[i]) {
 			auto &neigh = chunk->getNeigbour(i);
-			if(neigh) neigh->modify();
+			if(neigh) neigh->makeDirty();
 		}
 }

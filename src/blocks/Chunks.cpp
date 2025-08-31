@@ -1,3 +1,4 @@
+
 #include "Chunks.hpp"
 #include "Chunk.hpp"
 #include "Block.hpp"
@@ -26,6 +27,7 @@ Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), threadPool(1), li
 }
 
 void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
+    chunk->weak_self = chunk;
     for (int i = 0; i < 26; ++i) {
         int nx = chunk->x + OFFSETS[i][0];
         int ny = chunk->y + OFFSETS[i][1];
@@ -69,7 +71,10 @@ void Chunks::loadChunk(int x, int y, int z) {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
             loadNeighbours(decompressed);
         }
-        //lightSolver.calculateLight(decompressed);
+        for(int i =0; i < 26; i++) {
+            auto& neigh = decompressed->getNeigbour(i);
+            if(neigh) neigh->chunk_draw.modify();
+        }
         {
             std::unique_lock<std::shared_mutex> wl(chunkMapMutex);
             chunkMap.emplace(pos, decompressed);
@@ -85,7 +90,6 @@ void Chunks::loadChunk(int x, int y, int z) {
 
     auto fut = threadPool.submit([this, pos]() {
     	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
-        sptr->weak_self = sptr;
         {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
             loadNeighbours(sptr);
@@ -95,6 +99,7 @@ void Chunks::loadChunk(int x, int y, int z) {
         lightSolver.propagateSunLight(sptr);
         lightSolver.calculateLight(sptr);
         
+        RGBS_compression compression;
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
             auto it = chunkMap.find(pos);
@@ -134,11 +139,14 @@ void Chunks::unloadChunk(int x, int y, int z) {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);
     }
-    std::shared_ptr<ChunkCompressed> compressed = ChunkCompressor::compress(sptr);
-    {
-        std::unique_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
-        comprsChunkMap[key] = compressed;
+    if(sptr->isDirty()) {
+        std::shared_ptr<ChunkCompressed> compressed = ChunkCompressor::compress(sptr);
+        {
+            std::unique_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
+            comprsChunkMap[key] = compressed;
+        }
     }
+    
 }
 
 
@@ -246,4 +254,3 @@ void Chunks::update(const glm::dvec3 &playerPos) {
 		lastPlayerChunk = playerChunk;
 	}
 }
-

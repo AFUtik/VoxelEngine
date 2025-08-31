@@ -5,6 +5,7 @@
 #ifndef DRAWABLE_HPP
 #define DRAWABLE_HPP
 
+#include <atomic>
 #include <glm/ext.hpp>
 #include <memory>
 #include <GL/glew.h>
@@ -23,11 +24,23 @@ class DrawableObject {
 protected:
     std::shared_ptr<Mesh> mesh;
     Transform transform;
+
+    std::atomic<bool> modified{true};
 public:
     mutable std::shared_mutex meshMutex;
     Shader* shader = nullptr;
     
     DrawableObject() : mesh(nullptr) {}
+
+	inline void modify() { 
+		modified.store(true, std::memory_order_relaxed); 
+	}
+
+	inline void unmodify() {
+		modified.store(false, std::memory_order_relaxed); 
+	}
+
+	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
     
     inline Transform& getTransform() {return transform;}
 

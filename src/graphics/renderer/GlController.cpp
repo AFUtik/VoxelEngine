@@ -6,7 +6,7 @@
 void GlController::processAll() {
     {
         std::lock_guard<std::mutex> lk(meshDeleteMutex);
-        if (!glDelete.empty()) {
+        while (!glDelete.empty()) {
             gl_delete_cmd pr = glDelete.front();
             glDelete.pop();
 
@@ -17,7 +17,7 @@ void GlController::processAll() {
 
     {
         std::lock_guard<std::mutex> lk(meshUpdateMutex);
-        if (!glUpdate.empty()) {
+        while (!glUpdate.empty()) {
             gl_update_cmd pr = glUpdate.front();
             glUpdate.pop();
 

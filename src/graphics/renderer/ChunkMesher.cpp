@@ -1,5 +1,7 @@
+
 #include "ChunkMesher.hpp"
 #include <memory>
+#include <mutex>
 
 void ChunkMesher::meshWorkerThread() {
         while (true) {
@@ -14,32 +16,36 @@ void ChunkMesher::meshWorkerThread() {
 
                 sp = world->readyChunks.front();
                 world->readyChunks.pop();
-                
             }
             if(!sp) continue;
 
-            if(sp->isModified()) {
+            DrawableObject& draw = sp->chunk_draw;
+
+            if(draw.isModified()) {
                 std::shared_ptr<Mesh> mesh;
                 {
                     std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
                     mesh = makeChunk(sp.get());
                 }
+                
                 {
                     std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    sp->chunk_draw.loadMesh(mesh);
-                }            
+                    draw.loadMesh(mesh);
+                }
+
                 {
                     std::unique_lock<std::mutex> wlock(meshUploadMutex);
                     meshUploadQueue.push(sp);
                 }
-                sp->unmodify();
-            } else if(sp->isLightModified()) {
-                {
-                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    updateChunk(sp.get());
-                } 
-                sp->unmodifyLight();
-            }
+                draw.unmodify();
+            } 
+            //else if(draw.isUpdated()) {
+            //    {
+            //        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+            //        updateChunk(sp.get());
+            //    }
+            //    draw.unupdate();
+            //}
             meshUploadCv.notify_one();
         }
     }

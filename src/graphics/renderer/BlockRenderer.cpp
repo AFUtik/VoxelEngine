@@ -61,7 +61,7 @@ void BlockRenderer::render() {
                 mesh = chunk->chunk_draw.getMesh();
             }
 
-            if (chunk->isModified() || chunk->isLightModified()) {
+            if (chunk->chunk_draw.isModified()) {
                 {
                     std::lock_guard lk(world->readyQueueMutex);
                     world->readyChunks.push(chunk);
