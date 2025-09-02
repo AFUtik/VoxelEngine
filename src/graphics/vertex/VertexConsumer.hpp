@@ -5,10 +5,12 @@
 
 class VertexConsumer {
 	VertexBuffer* buffer;
-	uint32_t index = 0;
+	uint32_t index = 0, index2 = 0;
 public:
-    unsigned int ebo_index = 0;
-	unsigned int vbo_index = 0;
+    //unsigned int ebo_index = 0;
+	//unsigned int vbo_index = 0;
+
+	inline uint32_t getIndex() {return index;}
 
     VertexConsumer(VertexBuffer* buffer) : buffer(buffer) {};
 	VertexConsumer() : buffer(nullptr) {};

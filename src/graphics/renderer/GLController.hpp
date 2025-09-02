@@ -13,8 +13,9 @@ struct gl_delete_cmd {
 
 struct gl_update_cmd {
     uint32_t vbo; 
-    uint32_t vertex_count;
-    Vertex*  vertices;
+    uint32_t vertices;
+    uint32_t verticesUpdated;
+    Vertex*  verticesPtr;
 };
 
 class Mesh;
@@ -22,7 +23,7 @@ class Mesh;
 class GlController {
 public:
     std::queue<gl_delete_cmd> glDelete;
-    std::queue<gl_update_cmd> glUpdate;
+    std::queue<std::shared_ptr<Mesh>> glUpdate;
     std::queue<std::shared_ptr<Mesh>> glUpload;
 
     std::mutex meshDeleteMutex;

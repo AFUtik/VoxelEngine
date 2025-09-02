@@ -26,6 +26,7 @@ protected:
     Transform transform;
 
     std::atomic<bool> modified{true};
+    std::atomic<bool> updated {false};
 public:
     mutable std::shared_mutex meshMutex;
     Shader* shader = nullptr;
@@ -41,10 +42,26 @@ public:
 	}
 
 	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
+
+    // update methods // 
+
+    inline void update() { 
+		updated.store(true, std::memory_order_release); 
+	}
+
+	inline void unupdate() {
+		updated.store(false, std::memory_order_release); 
+	}
+
+	inline bool isUpdated() const { 
+        return updated.load(std::memory_order_acquire); 
+    }
     
     inline Transform& getTransform() {return transform;}
 
     void loadMesh(const std::shared_ptr<Mesh> &mesh);
+    void unloadMesh();
+
     inline Mesh* getMesh() {return mesh.get();}
     inline std::shared_ptr<Mesh> getSharedMesh() {return mesh;}
 

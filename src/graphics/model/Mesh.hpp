@@ -2,6 +2,7 @@
 #define GRAPHICS_MESH_HPP_
 
 #include <memory>
+#include <mutex>
 
 #include "../Instance.hpp"
 #include "../vertex/VertexBuffer.hpp"
@@ -19,11 +20,13 @@ class Mesh {
 
 	uint32_t VBO, VAO;
 	uint32_t vertices  = 0;
+	uint32_t verticesUpdated = 0;
 
 	friend class GlController;
-
 	friend class ChunkMesher;
 public:
+	mutable std::mutex mutex;
+
 	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
 	Mesh(GlController* glController);
 

@@ -61,7 +61,7 @@ void BlockRenderer::render() {
                 mesh = chunk->chunk_draw.getMesh();
             }
 
-            if (chunk->chunk_draw.isModified()) {
+            if (chunk->isDirty()) {
                 {
                     std::lock_guard lk(world->readyQueueMutex);
                     world->readyChunks.push(chunk);

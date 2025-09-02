@@ -1,6 +1,7 @@
 #ifndef LIGHTSOLVER_HPP_
 #define LIGHTSOLVER_HPP_
 
+#include "LightInfo.hpp"
 #include <memory>
 #include <queue>
 #include <cstdint>
@@ -10,15 +11,6 @@
 
 class Chunks;
 class Chunk;
-
-struct LightEntry {
-	/* Local Coords */
-	int32_t lx;
-	int32_t ly;
-	int32_t lz;
-	uint8_t light;
-	std::weak_ptr<Chunk> chunk;
-};
 
 constexpr int MAX_LIGHT_UPDATES = 1 << 20;
 
@@ -104,7 +96,8 @@ public:
 	void calculateLight(const std::shared_ptr<Chunk>& chunk);
 
 	void removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
-	void placeLightLocally (int lx, int ly, int lz, uint8_t emission, const std::shared_ptr<Chunk> &chunk);
+	
+	void placeLightLocally (int lx, int ly, int lz, Emission emission, const std::shared_ptr<Chunk> &chunk);
 };
 
 #endif /* LIGHTSOLVER_HPP */

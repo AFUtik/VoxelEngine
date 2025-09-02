@@ -3,6 +3,7 @@
 #include "Chunk.hpp"
 #include "Block.hpp"
 #include "ChunkInfo.hpp"
+#include "chunk_utils.hpp"
 #include "iostream"
 
 #include "../lighting/LightMap.hpp"
@@ -38,8 +39,8 @@ void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
             auto& neigh = it->second;
 
             std::scoped_lock lock(chunk->dataMutex, neigh->dataMutex);
-            chunk->neighbors[i]      = neigh;
-            neigh->neighbors[25 - i] = chunk;
+            chunk->loadNeighbour(i,    neigh);
+            neigh->loadNeighbour(25-i, chunk);
         }
     }
 }
@@ -71,10 +72,12 @@ void Chunks::loadChunk(int x, int y, int z) {
             std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
             loadNeighbours(decompressed);
         }
+
         for(int i =0; i < 26; i++) {
             auto& neigh = decompressed->getNeigbour(i);
-            if(neigh) neigh->chunk_draw.modify();
+            if(neigh) neigh->makeDirty();
         }
+
         {
             std::unique_lock<std::shared_mutex> wl(chunkMapMutex);
             chunkMap.emplace(pos, decompressed);
@@ -95,9 +98,10 @@ void Chunks::loadChunk(int x, int y, int z) {
             loadNeighbours(sptr);
         }
         
-
         lightSolver.propagateSunLight(sptr);
         lightSolver.calculateLight(sptr);
+
+        sptr->makeDirty();
         
         RGBS_compression compression;
         {
@@ -139,14 +143,13 @@ void Chunks::unloadChunk(int x, int y, int z) {
         std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
         chunkMap.erase(key);
     }
-    if(sptr->isDirty()) {
+    if(sptr->needToSave()) {
         std::shared_ptr<ChunkCompressed> compressed = ChunkCompressor::compress(sptr);
         {
             std::unique_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
             comprsChunkMap[key] = compressed;
         }
     }
-    
 }
 
 

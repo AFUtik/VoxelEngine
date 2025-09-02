@@ -37,10 +37,8 @@ public:
         T* new_data = new T[new_capacity];
         int* new_next = new int[new_capacity];
 
-        for (int i = 0; i < capacity; i++) {
-            new_data[i] = data[i];
-            new_next[i] = next[i];
-        }
+        std::memcpy(new_data, data, capacity * sizeof(T));
+        std::memcpy(new_next, next, capacity * sizeof(int));
 
         for(int i = capacity; i < new_capacity - 1; i++) new_next[i] = i + 1;
 
@@ -63,6 +61,15 @@ public:
         data[size-1] = object;
 
         size++;
+    }
+
+    inline void push(const T& object, uint32_t index) {
+        if(index >= size) {
+            size++;
+            if (index >= capacity) {resize(capacity*2);}
+        }
+
+        data[index] = object;
     }
 
     inline void allocate(const T& object) {

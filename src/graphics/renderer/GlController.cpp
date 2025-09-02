@@ -2,38 +2,10 @@
 #include "../model/Mesh.hpp"
 
 #include <GL/glew.h>
+#include <mutex>
+#include <shared_mutex>
 
 void GlController::processAll() {
-    {
-        std::lock_guard<std::mutex> lk(meshDeleteMutex);
-        while (!glDelete.empty()) {
-            gl_delete_cmd pr = glDelete.front();
-            glDelete.pop();
-
-            glDeleteVertexArrays(1, &pr.vao);
-            glDeleteBuffers(1, &pr.vbo);
-        }
-    }
-
-    {
-        std::lock_guard<std::mutex> lk(meshUpdateMutex);
-        while (!glUpdate.empty()) {
-            gl_update_cmd pr = glUpdate.front();
-            glUpdate.pop();
-
-            size_t size = sizeof(float) * VERTEX_SIZE * pr.vertex_count;
-
-            glBindBuffer(GL_ARRAY_BUFFER, pr.vbo);
-            void* ptr = glMapBufferRange(
-                GL_ARRAY_BUFFER,
-                0, size,
-                GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT
-            );
-            memcpy(ptr, pr.vertices, size);
-            glUnmapBuffer(GL_ARRAY_BUFFER);
-        }
-    }
-
     {
         std::lock_guard<std::mutex> lk(meshUploadMutex);
         while (!glUpload.empty()) {
@@ -43,6 +15,7 @@ void GlController::processAll() {
             if(!mesh || mesh->uploaded) continue;
 
             mesh->vertices = mesh->buffer->vertices.get_size();
+            mesh->verticesUpdated = mesh->vertices;
 
             glGenVertexArrays(1, &mesh->VAO);
             glGenBuffers(1, &mesh->VBO);
@@ -66,4 +39,42 @@ void GlController::processAll() {
             mesh->uploaded = true;
         }
     }
+    
+    {
+        std::lock_guard<std::mutex> lk(meshUpdateMutex);
+        while (!glUpdate.empty()) {
+            auto pr = glUpdate.front();
+            glUpdate.pop();
+
+            size_t size = sizeof(float) * VERTEX_SIZE * pr->verticesUpdated;
+
+            //std::lock_guard<std::mutex> l(pr->mutex);
+            glBindBuffer(GL_ARRAY_BUFFER, pr->VBO);
+            if(pr->verticesUpdated > pr->vertices) {
+                glBufferData(GL_ARRAY_BUFFER, size, pr->buffer->vertices.get_data(), GL_STATIC_DRAW);
+                pr->vertices = pr->verticesUpdated;
+            } else {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, size, pr->buffer->vertices.get_data());
+            }
+        }
+    }
+
+
+    
+    
+    
+    {
+        std::lock_guard<std::mutex> lk(meshDeleteMutex);
+        while (!glDelete.empty()) {
+            gl_delete_cmd pr = glDelete.front();
+            glDelete.pop();
+
+            glDeleteVertexArrays(1, &pr.vao);
+            glDeleteBuffers(1, &pr.vbo);
+        }
+    }
+
+    
+
+    
 }

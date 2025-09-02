@@ -24,6 +24,8 @@ class Chunk {
 
 	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
 	std::shared_ptr<Chunk> neighbors[26];
+	Chunk* rawNeighbours[26] {nullptr};
+
 	std::weak_ptr<Chunk> weak_self;
 	
 	std::unique_ptr<block[]> blocks;
@@ -34,30 +36,44 @@ class Chunk {
 	friend class ChunkMesher;
 	friend class LightSolver;
 
-	std::atomic<bool> dirty{false};
-	std::atomic<bool> lightDirty{false};
+	std::atomic<bool> needsSave   {false};
+	std::atomic<bool> dirty       {true};
 
 	Chunks* world;
 public:
 	mutable std::shared_mutex dataMutex;
 	DrawableObject chunk_draw;
 
+	inline void loadNeighbour(int ind, const std::shared_ptr<Chunk> &neigh) {
+		neighbors[ind]     = neigh;
+		rawNeighbours[ind] = neigh.get();
+	}
+
 	inline void clearNeighbours() {
-		for(int i = 0; i < 26; i++) neighbors[i].reset();
+		for(int i = 0; i < 26; i++) {
+			neighbors[i].reset();
+			rawNeighbours[i] = nullptr;
+		}
 	}
 
-	inline void makeDirty() { 
-		chunk_draw.modify();
-		dirty.store(true, std::memory_order_relaxed); 
-	}
+	inline bool needToSave() {return needsSave.load(std::memory_order_relaxed);}
 
-	inline void makeLightDirty() {
-		//chunk_draw.update();
-		lightDirty.store(true, std::memory_order_relaxed); 
+	inline void makeDirty() {
+		needsSave.store(true, std::memory_order_relaxed);
+		dirty.store(true, std::memory_order_relaxed);
+		
+		for(int i = 0; i < 6; ++i) {
+        	auto &neigh = neighbors[faceToIdx(i)];
+        	if(neigh) neigh->dirty.store(true, std::memory_order_relaxed);
+   		}
+	}
+	
+	inline void clearDirty() {
+		dirty.store(false, std::memory_order_relaxed);
 	}
 
 	inline bool isDirty() const { return dirty.load(std::memory_order_relaxed); }
-
+	
 	// World Pos //
 	int32_t x, y, z;
 	glm::vec3 min;
@@ -85,6 +101,10 @@ public:
 
 	inline const std::shared_ptr<Chunk>& getNeigbour(int ind) {
 		return neighbors[ind];
+	}
+
+	inline const Chunk* getRawNeigbour(int ind) {
+		return rawNeighbours[ind];
 	}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {
@@ -124,7 +144,7 @@ public:
 	}
 
 	inline block getBoundBlock(int32_t lx, int32_t ly, int32_t lz) {
-		if (lx >= 0 && lx < ChunkInfo::WIDTH &&
+		if (lx >= 0 && lx < ChunkInfo::WIDTH  &&
 			ly >= 0 && ly < ChunkInfo::HEIGHT &&
 			lz >= 0 && lz < ChunkInfo::DEPTH) {
 			return getBlock(lx, ly, lz);

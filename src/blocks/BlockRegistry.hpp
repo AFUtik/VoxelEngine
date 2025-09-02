@@ -6,20 +6,28 @@
 #include <vector>
 #include <unordered_map>
 
-struct TextureRegion;
+#include "../graphics/texture/TextureRegion.hpp"
 
-struct BlockPrototype {
-	uint16_t id;
-	std::string name;
+struct Identifier {
+    uint16_t id = 0;
+    std::string name;
+};
 
-	virtual bool isOpaque() = 0;
+struct BlockState : public Identifier {
+    TextureRegion textureRegion;
+};
+
+struct BlockPrototype : public Identifier {
+    std::vector<Identifier> states;
+    std::unordered_map<std::string, uint32_t> stateMap;
 };
 
 class BlockRegistry {
-    static std::vector<BlockRegistry> registry;
-    static std::unordered_map<std::string, uint32_t> umap;
+    static std::vector<BlockPrototype> registry;
+    static std::unordered_map<std::string, uint32_t> registryMap;
 public:
-    static void registerBlock(std::string name, BlockRegistry block);
+    static void registerBlock(std::string name, BlockPrototype block);
+    static void registerState(std::string block_name, std::string state_name, Identifier state);
 };
 
 #endif

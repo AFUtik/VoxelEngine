@@ -23,16 +23,16 @@ Mesh::~Mesh() {
 }
 
 void Mesh::update() {
-	if(uploaded) {
-		{
-			std::lock_guard<std::mutex> lk(glContoller->meshUpdateMutex);
-			glContoller->glUpdate.push({VBO, buffer->vertices.get_size(), buffer->vertices.get_data()});
-		}
-	}
+	//if(uploaded) {
+	//	{
+	//		std::lock_guard<std::mutex> lk(glContoller->meshUpdateMutex);
+	//		glContoller->glUpdate.push(this);
+	//	}
+	//}
 }
 
 void Mesh::draw(unsigned int primitive) const {
 	glBindVertexArray(VAO);
-	glDrawArrays(GL_TRIANGLES, 0, vertices);
+	glDrawArrays(GL_TRIANGLES, 0, verticesUpdated);
 	glBindVertexArray(0);
 }

@@ -7,7 +7,7 @@
 struct VertexBuffer {
     packed_freelist<Vertex> vertices;
 
-	VertexBuffer() : vertices(64) {}
+	VertexBuffer() : vertices(4096) {}
 };
 
 #endif

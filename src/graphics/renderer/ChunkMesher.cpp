@@ -21,31 +21,31 @@ void ChunkMesher::meshWorkerThread() {
 
             DrawableObject& draw = sp->chunk_draw;
 
-            if(draw.isModified()) {
-                std::shared_ptr<Mesh> mesh;
-                {
-                    std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    mesh = makeChunk(sp.get());
-                }
-                
-                {
-                    std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
-                    draw.loadMesh(mesh);
-                }
+            if(sp->isDirty()) {
+                if(draw.getMesh()) {
+                    {
+                        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                        updateChunk(sp.get());
+                    }
+                } else {
+                    std::shared_ptr<Mesh> mesh;
+                    {
+                        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                        mesh = makeChunk(sp.get());
+                    }
+                    
+                    {
+                        std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
+                        draw.loadMesh(mesh);
+                    }
 
-                {
-                    std::unique_lock<std::mutex> wlock(meshUploadMutex);
-                    meshUploadQueue.push(sp);
+                    {
+                        std::unique_lock<std::mutex> wlock(meshUploadMutex);
+                        meshUploadQueue.push(sp);
+                    }
                 }
-                draw.unmodify();
-            } 
-            //else if(draw.isUpdated()) {
-            //    {
-            //        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-            //        updateChunk(sp.get());
-            //    }
-            //    draw.unupdate();
-            //}
+                sp->clearDirty();
+            }
             meshUploadCv.notify_one();
         }
     }
