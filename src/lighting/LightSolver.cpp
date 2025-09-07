@@ -370,6 +370,7 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::sha
 	solverG->solve(neighbours);
 	solverB->solve(neighbours);
 	solverS->solve(neighbours);
+	propagateSunRay(lx, lz, chunk);
 
     std::array<bool,4> addedAny = {false,false,false,false};
     for (int face = 0; face < 6; ++face) {
@@ -382,8 +383,6 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, const std::sha
 		neighbour->makeDirty();
     }
 	
-	//propagateSunRay(lx, lz, chunk);
-
     if(addedAny[0]) solverR->solve(neighbours);
     if(addedAny[1]) solverG->solve(neighbours);
     if(addedAny[2]) solverB->solve(neighbours);
