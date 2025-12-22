@@ -37,8 +37,8 @@ BlockHit raycastBlock(const glm::dvec3& origin,
 
     double dist = 0.0;
 
+    
     while (dist <= maxDistance) {
-        // проверяем блок
         glm::ivec3 chunkCoord = worldToChunk3(blockPos);
         std::shared_ptr<Chunk> chunk = world->getChunk(chunkCoord.x, chunkCoord.y, chunkCoord.z);
         if (chunk) {
@@ -56,7 +56,6 @@ BlockHit raycastBlock(const glm::dvec3& origin,
             }
         }
 
-        // двигаемся к следующей границе
         if (tMax.x < tMax.y) {
             if (tMax.x < tMax.z) {
                 blockPos.x += step.x;

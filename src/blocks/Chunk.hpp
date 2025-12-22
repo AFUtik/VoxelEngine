@@ -1,6 +1,7 @@
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 
+#include <atomic>
 #include <memory>
 #include <shared_mutex>
 
@@ -9,6 +10,7 @@
 #include "../lighting/LightMap.hpp"
 #include "../noise/PerlinNoise.hpp"
 #include "../graphics/renderer/Drawable.hpp"
+#include "../lighting/LightInfo.hpp"
 
 #include "ChunkCompressor.hpp"
 #include "ChunkInfo.hpp"
@@ -19,30 +21,98 @@
 
 class Chunks;
 
-class Chunk {
-	//ChunkRenderInfo renderInfo;
+struct ChunkPos {
+    int32_t x, y, z;
+    bool operator==(const ChunkPos& o) const noexcept {
+        return x==o.x && y==o.y && z==o.z;
+    }
+};
 
-	/* Chunk has 4 horizontal neighbours, 2 vertical and 20 corner neigbours for correct lighting on chunk borders. */
+struct ChunkPosHash {
+    std::size_t operator()(const ChunkPos& p) const noexcept {
+        // FNV-1a style mix (fast and decent)
+        uint64_t h = 14695981039346656037ull;
+        auto mix = [&](uint32_t v){
+            h ^= v;
+            h *= 1099511628211ull;
+        };
+        mix(static_cast<uint32_t>(p.x));
+        mix(static_cast<uint32_t>(p.y));
+        mix(static_cast<uint32_t>(p.z));
+        return static_cast<std::size_t>(h ^ (h >> 32));
+    }
+};
+
+struct ChunkPosLess {
+    bool operator()(const ChunkPos& a, const ChunkPos& b) const {
+        if (a.x != b.x) return a.x < b.x;
+        if (a.y != b.y) return a.y < b.y;
+        return a.z < b.z;
+    }
+};
+
+enum class ChunkState : uint8_t {
+	Empty,
+	Generated,
+	Changed,
+	Lighted,
+	Finished,
+	Removed
+};
+
+class Chunk {
 	std::shared_ptr<Chunk> neighbors[26];
 	Chunk* rawNeighbours[26] {nullptr};
 
 	std::weak_ptr<Chunk> weak_self;
-	
-	std::unique_ptr<block[]> blocks;
-	std::unique_ptr<Lightmap> lightmap;
 
 	friend class Chunks;
 	friend class ChunkCompressor;
 	friend class ChunkMesher;
 	friend class LightSolver;
-
-	std::atomic<bool> needsSave   {false};
-	std::atomic<bool> dirty       {true};
-
-	Chunks* world;
+	
+	std::atomic<ChunkState> state {ChunkState::Empty};
+	std::atomic<uint32_t> version;
+	
+	ChunkPos hash_pos;
+	glm::vec3 min;
+	glm::vec3 max;
 public:
+	std::unique_ptr<Lightmap> lightmap;
+	std::unique_ptr<block[]> blocks;
+
+	int32_t x, y, z;
+
 	mutable std::shared_mutex dataMutex;
 	DrawableObject chunk_draw;
+
+	inline ChunkPos position() {return hash_pos;}
+
+	inline bool checkState(ChunkState expected) {return expected == state.load(std::memory_order_relaxed);}
+	inline bool checkVersion(uint32_t expected) {return expected == version.load(std::memory_order_relaxed);}
+
+	inline void setState(ChunkState new_state) {
+		version.fetch_add(1, std::memory_order_release);
+		state.store(new_state, std::memory_order_release);
+	}
+
+	// Basically we make dirty when terrain of a chunk is changed //
+	inline void dirty() {
+		version.fetch_add(1, std::memory_order_release);
+		state.store(ChunkState::Changed, std::memory_order_release);
+	}
+
+	// Tells a chunk that the lighting has been changed and he needs to rework the model //
+	inline void light() {
+		version.fetch_add(1, std::memory_order_release);
+		state.store(ChunkState::Lighted, std::memory_order_release);
+	}
+
+	inline void light_hot() {state.store(ChunkState::Lighted, std::memory_order_relaxed);}
+	
+	inline void finish() {
+		state.store(ChunkState::Finished, std::memory_order_release);
+	}
 
 	inline void loadNeighbour(int ind, const std::shared_ptr<Chunk> &neigh) {
 		neighbors[ind]     = neigh;
@@ -56,31 +126,9 @@ public:
 		}
 	}
 
-	inline bool needToSave() {return needsSave.load(std::memory_order_relaxed);}
-
-	inline void makeDirty() {
-		needsSave.store(true, std::memory_order_relaxed);
-		dirty.store(true, std::memory_order_relaxed);
-		
-		for(int i = 0; i < 6; ++i) {
-        	auto &neigh = neighbors[faceToIdx(i)];
-        	if(neigh) neigh->dirty.store(true, std::memory_order_relaxed);
-   		}
-	}
-	
-	inline void clearDirty() {
-		dirty.store(false, std::memory_order_relaxed);
-	}
-
-	inline bool isDirty() const { return dirty.load(std::memory_order_relaxed); }
-	
 	// World Pos //
-	int32_t x, y, z;
-	glm::vec3 min;
-	glm::vec3 max;
+	Chunk(int x, int y, int z) : x(x), y(y), z(z), hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {}
 
-	Chunk(int x, int y, int z) : x(x), y(y), z(z), blocks(new block[ChunkInfo::VOLUME]), lightmap(new Lightmap) {}
-	
 	/*
 	 * Transforms global coordinates into local coords.
 	 */
@@ -172,7 +220,6 @@ public:
 
 	void Chunk::setLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel, int32_t emission);
 
-	Chunk(int x, int y, int z, PerlinNoise& generator);
 };
 
 #endif

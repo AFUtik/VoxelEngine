@@ -9,7 +9,7 @@ class Chunks;
 struct BlockHit {
     bool hit = false;
     int lx, ly, lz;
-    std::weak_ptr<Chunk> chunk;
+    std::shared_ptr<Chunk> chunk;
     block blockData;
 };
 

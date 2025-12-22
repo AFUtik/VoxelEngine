@@ -54,7 +54,6 @@ public:
         cond.notify_one();
         return res;
     }
-
 private:
     std::vector<std::thread> workers;
     std::queue<std::function<void()>> tasks;

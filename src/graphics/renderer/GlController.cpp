@@ -59,10 +59,6 @@ void GlController::processAll() {
         }
     }
 
-
-    
-    
-    
     {
         std::lock_guard<std::mutex> lk(meshDeleteMutex);
         while (!glDelete.empty()) {
@@ -73,8 +69,4 @@ void GlController::processAll() {
             glDeleteBuffers(1, &pr.vbo);
         }
     }
-
-    
-
-    
 }

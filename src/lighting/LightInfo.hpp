@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <structures/RingBuffer.hpp>
 
 class Chunk;
 

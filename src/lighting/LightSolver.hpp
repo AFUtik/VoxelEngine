@@ -2,28 +2,25 @@
 #define LIGHTSOLVER_HPP_
 
 #include "LightInfo.hpp"
+#include "../structures/RingBuffer.hpp"
 #include <memory>
-#include <queue>
 #include <cstdint>
-#include <structures/RingBuffer.hpp>
 
-#include <shared_mutex>
+#include "../blocks/Chunk.hpp"
+#include <map>
 
 class Chunks;
-class Chunk;
-
-constexpr int MAX_LIGHT_UPDATES = 1 << 20;
 
 class LightSolver {
-	RingBuffer<LightEntry, MAX_LIGHT_UPDATES> addqueue;
-	RingBuffer<LightEntry, MAX_LIGHT_UPDATES> remqueue;
+	RingBuffer<LightEntry, 65536*2> addqueue;
+	RingBuffer<LightEntry, 65536*2> remqueue;
 	Chunks* chunks;
 	int channel;
 
+	
+
 	friend class BasicLightSolver;
 public:
-	mutable std::shared_mutex lightMutex;
-
 	LightSolver(Chunks* chunks, int channel);
 
 	/*
@@ -46,7 +43,7 @@ public:
 
 	void removeLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
 
-	void solve(bool (&neigbours_dirty)[26]);
+	void solve();
 };
 
 class BasicLightSolver {
@@ -97,7 +94,7 @@ public:
 
 	void removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
 	
-	void placeLightLocally (int lx, int ly, int lz, Emission emission, const std::shared_ptr<Chunk> &chunk);
+	void placeLightLocally(int lx, int ly, int lz, Emission emission, const std::shared_ptr<Chunk> &chunk);
 };
 
 #endif /* LIGHTSOLVER_HPP */

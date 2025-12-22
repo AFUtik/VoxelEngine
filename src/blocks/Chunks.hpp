@@ -3,24 +3,20 @@
 
 #include <cstdint>
 #include <unordered_set>
-#include <vector>
 #include <map>
-#include <unordered_map>
 
-#include <array>
 #include <memory>
 
 #include <shared_mutex>
 #include <mutex>
 #include <condition_variable>
 #include <queue>
-#include <future>
 
 #include <glm/glm.hpp>
+#include <variant>
 
 #include "Chunk.hpp"
 #include "ChunkInfo.hpp"
-#include <structures/ThreadPool.hpp>
 
 #include "../lighting/LightSolver.hpp"
 #include "../noise/PerlinNoise.hpp"
@@ -35,35 +31,20 @@ inline glm::ivec3 worldToChunk3(glm::dvec3 pos) {
              floorDiv(pos.z, ChunkInfo::DEPTH) };
 }
 
-struct ChunkPos {
-    int32_t x, y, z;
-    bool operator==(const ChunkPos& o) const noexcept {
-        return x==o.x && y==o.y && z==o.z;
-    }
+enum class WorldTaskType : uint8_t {
+	Generate,
+	GenerateLight,
+	CalculateLight,
+	Load,
+	Unload,
+	Finish,
+
+	CreateBlock,
+	DestroyBlock,
 };
 
-struct ChunkPosHash {
-    std::size_t operator()(const ChunkPos& p) const noexcept {
-        // FNV-1a style mix (fast and decent)
-        uint64_t h = 14695981039346656037ull;
-        auto mix = [&](uint32_t v){
-            h ^= v;
-            h *= 1099511628211ull;
-        };
-        mix(static_cast<uint32_t>(p.x));
-        mix(static_cast<uint32_t>(p.y));
-        mix(static_cast<uint32_t>(p.z));
-        return static_cast<std::size_t>(h ^ (h >> 32));
-    }
-};
-
-struct ChunkPosLess {
-    bool operator()(const ChunkPos& a, const ChunkPos& b) const {
-        if (a.x != b.x) return a.x < b.x;
-        if (a.y != b.y) return a.y < b.y;
-        return a.z < b.z;
-    }
-};
+typedef ChunkPos Pos;
+typedef std::pair<WorldTaskType, std::variant<Pos, std::shared_ptr<Chunk>>> WorldTask;
 
 class Chunks {
 	PerlinNoise noise;
@@ -77,39 +58,41 @@ class Chunks {
 	std::map<ChunkPos, std::shared_ptr<ChunkCompressed>, ChunkPosLess> comprsChunkMap;
 	mutable std::shared_mutex comprsChunkMapMutex;
 
-	/*
-	 * Used to find a chunk near player.
-	 */
-	std::unordered_set<std::shared_ptr<Chunk>> readyChunksSet;
-	mutable std::mutex loadingSetMutex;
-
 	ivec3 lastPlayerChunk = ivec3(0.0);
 
 	// multithreading //
-
-	
-	ThreadPool threadPool;
-
 	std::mutex readyQueueMutex;
-    
     std::condition_variable readyCv;
-	
-	std::unordered_set<ChunkPos, ChunkPosHash> loadingSet;
-	std::vector<std::future<void>> generationFutures;
+
+	// MAIN WORLD WORKER // 
+	ChunkState finalStep = ChunkState::Lighted;
+
+	std::thread worldWorker;
+
+	std::queue<WorldTask> tasks;
+
+	std::mutex taskQueueMutex;
+	std::condition_variable taskCv;
+	bool stop_workers = false;
+
+	void workerThread();
 
 	// Neighbour methods //
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	Chunk* generateChunk(int x, int y, int z);
 
-	void unloadChunk(int x, int y, int z);
-	void loadChunk  (int x, int y, int z);
+	void finishChunk(std::shared_ptr<Chunk> chunk);
+	void generateChunk(std::shared_ptr<Chunk> chunk);
 
 	friend class BlockRenderer;
 	friend class ChunkMesher;
 public:
+	void pushTask(WorldTaskType task, std::variant<Pos, std::shared_ptr<Chunk>> var);
+
 	BasicLightSolver lightSolver;
 
 	Chunks(int w, int h, int d, bool lighting);
+	~Chunks();
 
 	block getBlock(int x, int y, int z);
 	std::shared_ptr<Chunk> getChunk(int x, int y, int z);

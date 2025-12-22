@@ -1,61 +1,8 @@
-#include "Block.hpp"
 #include "Chunk.hpp"
 
-#include <iostream>
-#include <chrono>
-
-#include "../noise/PerlinNoise.hpp"
 #include "../lighting/LightMap.hpp"
-#include "ChunkInfo.hpp"
-
 #include <glm/ext.hpp>
-#include <cmath>
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
-
-Chunk::Chunk(int x, int y, int z, PerlinNoise& generator) :
-	lightmap(new Lightmap),
-	blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)),
-	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
-	max(x*ChunkInfo::WIDTH+ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH+ChunkInfo::DEPTH),
-	x(x), y(y), z(z) {
-	std::lock_guard<std::shared_mutex> sl(dataMutex);
-	const float scale = 0.02f;
-	const float scale2 = 0.02f;
-	const float height = 10.0f;
-	for (int _z = 0; _z < ChunkInfo::DEPTH; _z++) {
-		for (int _x = 0; _x < ChunkInfo::WIDTH; _x++) {
-			// Global position //
-			const int gx = _x + this->x * ChunkInfo::WIDTH;
-			const int gz = _z + this->z * ChunkInfo::DEPTH;
-			
-			
-
-			int y = height * generator.noise(
-				static_cast<float>(gx)*scale,
-				static_cast<float>(gz)*scale);
-
-			for(int _y = 0; _y < y + 100; _y++) {
-				float n = generator.noise(
-				static_cast<float>(gx)*scale2,
-				static_cast<float>(_y + this->y * ChunkInfo::HEIGHT)*scale2,
-				static_cast<float>(gz)*scale2
-				);
-				int id = 1;
-				if (n < 0.0005) id = 0;
-				
-				if(id != 0 && (_x == ChunkInfo::WIDTH-1 || _z == ChunkInfo::DEPTH-1)) {
-					setBlock(_x, _y, _z, 2);
-					continue;
-				};
-
-				setBlock(_x, _y, _z, id);
-			}
-		}
-	}
-
-}
 
 uint8_t Chunk::getBoundLight(int lx, int ly, int lz, int channel) {
 	Chunk *chunk = findNeighbourChunk(lx, ly, lz);

@@ -3,8 +3,6 @@
 
 #include "../vertex/VertexConsumer.hpp"
 #include "../vertex/VertexInfo.hpp"
-#include "../texture/TextureRegion.hpp"
-#include "structures/PackedFreelist.hpp"
 
 #include <cstdint>
 #include <array>
@@ -13,7 +11,6 @@ enum class direction : uint8_t {
     UP = 0, DOWN = 1, EAST = 2, WEST = 3, NORTH = 4, SOUTH = 5
 };
 
-// удобнее индексировать компоненты света
 struct LightSample {
     float r[4];
     float g[4];
@@ -23,15 +20,14 @@ struct LightSample {
 
 struct FaceInfo {
     float x, y, z;
-    // у тебя в оригинале были u1,u2,v1,v2 — делаем их явными
     float u1, u2, v1, v2;
     LightSample lightSample;
 };
 
 struct FaceVertTpl {
-    float ox, oy, oz;   // offset от центра блока
-    float u, v;         // локальные UV (будут прибавлены к faceInfo.u/v)
-    uint8_t cornerIdx;  // 0..3 индекс соответствующей компоненты в LightSample
+    float ox, oy, oz;
+    float u, v;
+    uint8_t cornerIdx; 
 };
 
 struct CubeMesher {

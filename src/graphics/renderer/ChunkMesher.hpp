@@ -21,6 +21,8 @@
 #include <mutex>
 #include <chrono>
 
+#include <iostream>
+
 class Mesher;
 
 using namespace glm;
@@ -34,14 +36,10 @@ class ChunkMesher {
     Chunks* world;
 
     std::mutex meshUploadMutex;
-
     std::queue<std::shared_ptr<Chunk>> meshUploadQueue;
-
     std::condition_variable meshUploadCv;
-
     std::thread worker;
     bool stop = false;
-
     bool light_flag = true;
 
     CubeMesher cubeMesher;
@@ -130,7 +128,6 @@ public:
     }
 
     ~ChunkMesher() {
-        // сигнализируем потоку остановиться
         {
             std::lock_guard<std::mutex> lk(world->readyQueueMutex);
             stop = true;
@@ -168,7 +165,8 @@ public:
                     if (!id) continue;
                     makeCube(chunk, consumer, x, y, z, vox.id);
                 }
-        }}
+            }
+        }
         {
             std::lock_guard<std::mutex> lk(glController->meshUploadMutex);
             glController->glUpload.push(mesh);

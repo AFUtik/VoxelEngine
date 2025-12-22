@@ -4,7 +4,7 @@
 #include <mutex>
 
 void ChunkMesher::meshWorkerThread() {
-        while (true) {
+    while (true) {
             std::shared_ptr<Chunk> sp;
             {
                 std::unique_lock lk(world->readyQueueMutex);
@@ -21,19 +21,18 @@ void ChunkMesher::meshWorkerThread() {
 
             DrawableObject& draw = sp->chunk_draw;
 
-            if(sp->isDirty()) {
+            if(sp->checkState(ChunkState::Finished)) {
                 if(draw.getMesh()) {
-                    {
-                        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
-                        updateChunk(sp.get());
-                    }
+                    updateChunk(sp.get());
                 } else {
                     std::shared_ptr<Mesh> mesh;
                     {
-                        std::shared_lock<std::shared_mutex> wlock(sp->dataMutex);
+                        std::shared_lock<std::shared_mutex> wl(sp->dataMutex);
                         mesh = makeChunk(sp.get());
                     }
                     
+                    if(mesh==nullptr) continue;
+
                     {
                         std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
                         draw.loadMesh(mesh);
@@ -44,7 +43,6 @@ void ChunkMesher::meshWorkerThread() {
                         meshUploadQueue.push(sp);
                     }
                 }
-                sp->clearDirty();
             }
             meshUploadCv.notify_one();
         }

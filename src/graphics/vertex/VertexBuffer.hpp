@@ -2,7 +2,7 @@
 #define VERTEXBUFFER_HPP
 
 #include "VertexInfo.hpp"
-#include <structures/PackedFreelist.hpp>
+#include "../../structures/PackedFreelist.hpp"
 
 struct VertexBuffer {
     packed_freelist<Vertex> vertices;

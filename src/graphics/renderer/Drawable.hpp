@@ -25,37 +25,11 @@ protected:
     std::shared_ptr<Mesh> mesh;
     Transform transform;
 
-    std::atomic<bool> modified{true};
-    std::atomic<bool> updated {false};
 public:
     mutable std::shared_mutex meshMutex;
     Shader* shader = nullptr;
     
     DrawableObject() : mesh(nullptr) {}
-
-	inline void modify() { 
-		modified.store(true, std::memory_order_relaxed); 
-	}
-
-	inline void unmodify() {
-		modified.store(false, std::memory_order_relaxed); 
-	}
-
-	inline bool isModified() const { return modified.load(std::memory_order_relaxed); }
-
-    // update methods // 
-
-    inline void update() { 
-		updated.store(true, std::memory_order_release); 
-	}
-
-	inline void unupdate() {
-		updated.store(false, std::memory_order_release); 
-	}
-
-	inline bool isUpdated() const { 
-        return updated.load(std::memory_order_acquire); 
-    }
     
     inline Transform& getTransform() {return transform;}
 
@@ -71,7 +45,7 @@ public:
         if(!shader) return;
 
         glUniformMatrix4fv(shader->model_loc, 1, GL_FALSE, glm::value_ptr(transform.model(camera)));
-        mesh->draw(3);
+        if(mesh && mesh->isUploaded()) mesh->draw(3);
     };
 };
 

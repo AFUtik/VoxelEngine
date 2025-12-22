@@ -127,55 +127,46 @@ int main(int argc, char* argv[])
 			if (Events::jpressed(GLFW_KEY_H)) {
 				glm::ivec3 pos = worldToChunk3(camera->getPosition());
 				auto chunk = world->getChunk(pos.x, pos.y, pos.z);
-				chunk->chunk_draw.modify();
 			}
 			if (Events::jpressed(GLFW_KEY_K)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
 				if(hit.hit) {
-					if(auto chunk = hit.chunk.lock())  {
+					if(auto chunk = hit.chunk)  {
 						{
 							std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
 							chunk->setBlock(hit.lx, hit.ly + 1, hit.lz, 2);
 						}
-						world->lightSolver.placeLightLocally(hit.lx, hit.ly + 1, hit.lz, Emission{15, 0, 15, 13}, chunk);
+						//world->lightSolver.placeLightLocally(hit.lx, hit.ly + 1, hit.lz, Emission{15, 0, 15, 13}, chunk);
 					}
 				}
 			}
 			if (Events::jpressed(GLFW_KEY_L)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
 				if(hit.hit) {
-					if(auto chunk = hit.chunk.lock())  {
+					if(auto chunk = hit.chunk)  {
 						{
 							std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
 							chunk->setBlock(hit.lx, hit.ly + 1, hit.lz, 2);
 						}
-						world->lightSolver.placeLightLocally(hit.lx, hit.ly + 1, hit.lz, Emission{15, 15, 0, 13}, chunk);
+						//world->lightSolver.placeLightLocally(hit.lx, hit.ly + 1, hit.lz, Emission{15, 15, 0, 13}, chunk);
 					}
 				}
 			}
 			if (Events::jpressed(GLFW_KEY_H)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
 				if(hit.hit) {
-					if(auto chunk = hit.chunk.lock())  {
+					if(auto chunk = hit.chunk)  {
 						{
 							std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
 							chunk->setBlock(hit.lx, hit.ly + 1, hit.lz, 1);
 						}
-						world->lightSolver.removeLightLocally(hit.lx, hit.ly + 1, hit.lz, chunk);
+						//world->lightSolver.removeLightLocally(hit.lx, hit.ly + 1, hit.lz, chunk);
 					}
 				}
 			}
 			if (Events::jpressed(GLFW_KEY_J)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
-				if(hit.hit) {
-					if(auto chunk = hit.chunk.lock())  {
-						{
-							std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
-							chunk->setBlock(hit.lx, hit.ly, hit.lz, 0);
-						}
-						world->lightSolver.removeLightLocally(hit.lx, hit.ly, hit.lz, chunk);
-					}
-				}
+				if(hit.hit) world->pushTask(WorldTaskType::DestroyBlock, Pos{hit.lx, hit.ly, hit.lz});
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {
 				camera->setydir(glm::dvec3(0, 1, 0));
@@ -209,7 +200,7 @@ int main(int argc, char* argv[])
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			camera->originRebase();
-			
+
 			shader->use();
 
 			glm::mat4 projview = camera->getProjection() * camera->updateView();

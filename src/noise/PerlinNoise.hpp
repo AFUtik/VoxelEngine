@@ -8,7 +8,6 @@ class PerlinNoise {
 	uint8_t p[512] = {};
 	std::mt19937 gen;
 
-
 	float scalex, scaley, scalez;
 
 	uint64_t seed;

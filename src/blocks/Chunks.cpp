@@ -8,8 +8,8 @@
 
 #include "../lighting/LightMap.hpp"
 #include "../lighting/LightSolver.hpp"
-#include "structures/ThreadPool.hpp"
 
+#include <atomic>
 #include <glm/glm.hpp>
 #include <memory>
 #include <mutex>
@@ -23,8 +23,18 @@ using namespace glm;
 
 #include "../lighting/LightCompressor.hpp"
 
-Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), threadPool(1), lightSolver(this)  {
+Chunks::Chunks(int w, int h, int d, bool lighting) : noise(0), lightSolver(this)  {
 	noise.octaves = 2;
+    worldWorker = std::thread([this] { workerThread(); });
+}
+
+Chunks::~Chunks() {
+    {
+        std::lock_guard<std::mutex> lk(taskQueueMutex);
+        stop_workers = true;
+    }
+    taskCv.notify_all();
+    if (worldWorker.joinable()) worldWorker.join();
 }
 
 void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
@@ -45,113 +55,151 @@ void Chunks::loadNeighbours(std::shared_ptr<Chunk> chunk) {
     }
 }
 
-Chunk* Chunks::generateChunk(int cx, int cy, int cz) {
-	auto [it, inserted] = chunkMap.emplace(
-					ChunkPos{cx,cy,cz}, 
-					std::make_unique<Chunk>(cx,cy,cz,noise)
+// SIMPLE GENERATION FUNCTION // 
+void Chunks::generateChunk(std::shared_ptr<Chunk> chunk) {
+    const float scale = 0.02f;
+	const float scale2 = 0.02f;
+	const float height = 10.0f;
+	for (int _z = 0; _z < ChunkInfo::DEPTH; _z++) {
+		for (int _x = 0; _x < ChunkInfo::WIDTH; _x++) {
+			// Global position //
+			const int gx = _x + chunk->x * ChunkInfo::WIDTH;
+			const int gz = _z + chunk->z * ChunkInfo::DEPTH;
+            
+			int y = height * noise.noise(
+				static_cast<float>(gx)*scale,
+				static_cast<float>(gz)*scale);
+
+			for(int _y = 0; _y < y + 200; _y++) {
+				float n = noise.noise(
+				static_cast<float>(gx)*scale2,
+				static_cast<float>(_y + chunk->y * ChunkInfo::HEIGHT)*scale2,
+				static_cast<float>(gz)*scale2
 				);
-	Chunk* chunk = it->second.get();
-	return chunk;
+				int id = 1;
+				if (n < 0.0005) id = 0;
+				
+				//if(id != 0 && (_x == ChunkInfo::WIDTH-1 || _z == ChunkInfo::DEPTH-1)) {
+				//	chunk->setBlock(_x, _y, _z, 2);
+				//	continue;
+				//};
+
+				chunk->setBlock(_x, _y, _z, id);
+			}
+		}
+	}
 }
 
-void Chunks::loadChunk(int x, int y, int z) {
-    ChunkPos pos{x, y, z};
+void Chunks::pushTask(WorldTaskType task, std::variant<Pos, std::shared_ptr<Chunk>> var) {
     {
-        std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-        if (chunkMap.find(pos) != chunkMap.end()) return;
+        std::unique_lock<std::mutex> m(taskQueueMutex);
+        tasks.push({task, var});
     }
-    std::shared_ptr<Chunk> decompressed;
+    taskCv.notify_one();
+}
+
+void Chunks::finishChunk(std::shared_ptr<Chunk> chunk) {
+    chunk->setState(ChunkState::Finished); 
     {
-        std::shared_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
-
-        auto it = comprsChunkMap.find(pos);
-        if (it != comprsChunkMap.end()) decompressed = ChunkCompressor::decompress(it->second);
+        std::lock_guard lk(readyQueueMutex);
+        readyChunks.push(chunk);
     }
-    if(decompressed) {
-        {
-            std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-            loadNeighbours(decompressed);
-        }
+    readyCv.notify_one();
+}
 
-        for(int i =0; i < 26; i++) {
-            auto& neigh = decompressed->getNeigbour(i);
-            if(neigh) neigh->makeDirty();
-        }
-
+void Chunks::workerThread() {
+    while (true) {
+        WorldTask task;
         {
-            std::unique_lock<std::shared_mutex> wl(chunkMapMutex);
-            chunkMap.emplace(pos, decompressed);
-            return;
+            std::unique_lock lk(taskQueueMutex);
+            taskCv.wait(lk, [&] {
+                return stop_workers || !tasks.empty();
+            });
+            if (stop_workers && tasks.empty())
+                break;
+            task = tasks.front();
+            tasks.pop();
         }
-    }
-    
-    {
-        std::unique_lock<std::mutex> ls(loadingSetMutex);
-        if (loadingSet.find(pos) != loadingSet.end()) return;
-        loadingSet.insert(pos);
-    }
+        switch(task.first) {
+            case WorldTaskType::Generate: 
+            { 
+                std::shared_ptr<Chunk> &chunk = std::get<std::shared_ptr<Chunk>>(task.second);
+                if(chunk->state.load(std::memory_order_relaxed) == ChunkState::Removed) continue;
 
-    auto fut = threadPool.submit([this, pos]() {
-    	std::shared_ptr<Chunk> sptr = std::make_shared<Chunk>(pos.x, pos.y, pos.z, noise);
-        {
-            std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
-            loadNeighbours(sptr);
-        }
-        
-        lightSolver.propagateSunLight(sptr);
-        lightSolver.calculateLight(sptr);
+                std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
+                {
+                    if(!chunk->checkState(ChunkState::Empty)) continue;
+                    auto it = chunkMap.find(chunk->hash_pos);
+                    if (it != chunkMap.end()) continue;
+                }
+                generateChunk(chunk);
+                loadNeighbours(chunk);
+                chunkMap.emplace(chunk->position(), chunk);
 
-        sptr->makeDirty();
-        
-        RGBS_compression compression;
-        {
-            std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
-            auto it = chunkMap.find(pos);
-            if (it == chunkMap.end()) {
-                chunkMap.emplace(pos, sptr);
-            } else {
-                loadingSet.erase(pos);
-                return;
+                chunk->state.store(ChunkState::Generated, std::memory_order_release);
+                pushTask(WorldTaskType::GenerateLight, chunk);
+
+                break;
+            }
+            case WorldTaskType::Unload: 
+            {
+                std::shared_ptr<Chunk> &chunk = std::get<std::shared_ptr<Chunk>>(task.second);
+                if(chunk->state.load(std::memory_order_relaxed) == ChunkState::Removed) continue;
+
+                {
+                    std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
+                    auto it = chunkMap.find(chunk->hash_pos);
+                    if (it == chunkMap.end()) continue;
+                }
+                chunk->clearNeighbours();
+                {
+                    std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+                    chunkMap.erase(chunk->hash_pos);
+                }
+                chunk->setState(ChunkState::Removed);
+                break;
+            }
+            case WorldTaskType::GenerateLight: {
+                std::shared_ptr<Chunk> &chunk = std::get<std::shared_ptr<Chunk>>(task.second);
+                if(chunk->state.load(std::memory_order_relaxed) == ChunkState::Removed) continue;
+
+                lightSolver.propagateSunLight(chunk);
+                lightSolver.calculateLight(chunk);
+
+                chunk->setState(ChunkState::Lighted);
+
+                break;
+            }
+            case WorldTaskType::CalculateLight: {
+                std::shared_ptr<Chunk> &chunk = std::get<std::shared_ptr<Chunk>>(task.second);
+                if(chunk->state.load(std::memory_order_relaxed) == ChunkState::Removed) continue;
+
+                lightSolver.calculateLight(chunk);
+
+                chunk->setState(ChunkState::Lighted);
+
+                break;
+            }
+            case WorldTaskType::DestroyBlock: {
+                Pos pos = std::get<Pos>(task.second);
+
+                auto chunk = getChunkByBlock(pos.x, pos.y, pos.z);
+  
+                chunk->setBlock(pos.x, pos.y, pos.z, 0);
+                chunk->light();
+
+                break;
+            }
+            default: {
+                break;
             }
         }
-        
-        {
-            std::lock_guard<std::mutex> ql(readyQueueMutex);
-            readyChunks.push(sptr);
-            readyCv.notify_one();
-        }
-
-        {
-            std::unique_lock<std::mutex> ls(loadingSetMutex);
-            loadingSet.erase(pos);
-        }
-    });
-    generationFutures.emplace_back(std::move(fut));
-}
-
-void Chunks::unloadChunk(int x, int y, int z) {
-	ChunkPos key{x,y,z};
-    std::shared_ptr<Chunk> sptr;
-    {
-        std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
-        auto it = chunkMap.find(key);
-        if (it == chunkMap.end()) return;
-        sptr = it->second;
-    }
-    sptr->clearNeighbours();
-    {
-        std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
-        chunkMap.erase(key);
-    }
-    if(sptr->needToSave()) {
-        std::shared_ptr<ChunkCompressed> compressed = ChunkCompressor::compress(sptr);
-        {
-            std::unique_lock<std::shared_mutex> mapLock(comprsChunkMapMutex);
-            comprsChunkMap[key] = compressed;
+        if(std::holds_alternative<std::shared_ptr<Chunk>>(task.second)) {
+            std::shared_ptr<Chunk> &chunk = std::get<std::shared_ptr<Chunk>>(task.second);
+            if(chunk->checkState(ChunkState::Lighted)) finishChunk(chunk);
         }
     }
 }
-
 
 block Chunks::getBlock(int x, int y, int z) {
 	{
@@ -184,9 +232,8 @@ unsigned char Chunks::getLight(int x, int y, int z, int channel) {
 		int lx = x - cx * ChunkInfo::WIDTH;
 		int ly = y - cy * ChunkInfo::HEIGHT;
 		int lz = z - cz * ChunkInfo::DEPTH;
-		return chunk->lightmap->get(lx, ly, lz, channel);
+		return chunk->getLight(lx, ly, lz, channel);
 	}
-	
 }
 
 std::shared_ptr<Chunk> Chunks::getChunkByBlock(int x, int y, int z) {
@@ -220,19 +267,24 @@ bool insideRadius(const ivec3 &center, const ChunkPos &p, int radius) {
 }
 
 void Chunks::update(const glm::dvec3 &playerPos) {
-    //generationFutures
-    
     ivec3 playerChunk = worldToChunk3(playerPos);
-
-    std::vector<ChunkPos> toUnload;
     {
         std::shared_lock<std::shared_mutex> sl(chunkMapMutex);
         for (auto& [pos, chunk] : chunkMap) {
-            if (!insideRadius(playerChunk, pos, loadDistance)) toUnload.push_back(pos);
+            if (!insideRadius(playerChunk, pos, loadDistance)) pushTask(WorldTaskType::Unload, chunk);
+            else {
+                switch (chunk->state) {
+                    case ChunkState::Finished: {
+                        pushTask(WorldTaskType::Finish, chunk);
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
         }
     }
-    for (auto& pos : toUnload) unloadChunk(pos.x, pos.y, pos.z);
-    
+
 	if (playerChunk != lastPlayerChunk) {
 		glm::ivec3 delta = playerChunk - lastPlayerChunk;
 
@@ -241,7 +293,7 @@ void Chunks::update(const glm::dvec3 &playerPos) {
 			int newX = playerChunk.x + delta.x * loadDistance;
 
 			for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
-				loadChunk(newX, 0, z);
+                pushTask(WorldTaskType::Generate, std::make_shared<Chunk>(newX, 0, z));
 			}
 		}
 
@@ -250,7 +302,7 @@ void Chunks::update(const glm::dvec3 &playerPos) {
 			int newZ = playerChunk.z + delta.z * loadDistance;
 
 			for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
-				loadChunk(x, 0, newZ);
+                pushTask(WorldTaskType::Generate, std::make_shared<Chunk>(x, 0, newZ));
 			}
 		}
 

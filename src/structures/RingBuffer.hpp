@@ -15,7 +15,6 @@ public:
         buffer[head] = entry;
         head = (head + 1) % UPDATES;
     }
-
     inline T& read() {
         T& entry = buffer[tail];
         tail = (tail + 1) % UPDATES;
