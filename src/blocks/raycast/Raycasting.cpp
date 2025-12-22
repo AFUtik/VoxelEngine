@@ -51,7 +51,7 @@ BlockHit raycastBlock(const glm::dvec3& origin,
             {
                 block b = chunk->getBlock(lx, ly, lz);
                 if (b.id != 0) {
-                    return BlockHit{true, lx, ly, lz, chunk, b};
+                    return BlockHit{true, blockPos.x, blockPos.y, blockPos.z};
                 }
             }
         }

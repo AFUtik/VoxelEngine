@@ -2,7 +2,7 @@
 #define CHUNKS_HPP
 
 #include <cstdint>
-#include <unordered_set>
+#include <functional>
 #include <map>
 
 #include <memory>
@@ -31,20 +31,12 @@ inline glm::ivec3 worldToChunk3(glm::dvec3 pos) {
              floorDiv(pos.z, ChunkInfo::DEPTH) };
 }
 
-enum class WorldTaskType : uint8_t {
-	Generate,
-	GenerateLight,
-	CalculateLight,
-	Load,
-	Unload,
-	Finish,
-
-	CreateBlock,
-	DestroyBlock,
+struct BlockCommand {
+	int x, y, z;
+	int newId;
 };
 
 typedef ChunkPos Pos;
-typedef std::pair<WorldTaskType, std::variant<Pos, std::shared_ptr<Chunk>>> WorldTask;
 
 class Chunks {
 	PerlinNoise noise;
@@ -55,21 +47,15 @@ class Chunks {
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
 	mutable std::shared_mutex chunkMapMutex;
 
-	std::map<ChunkPos, std::shared_ptr<ChunkCompressed>, ChunkPosLess> comprsChunkMap;
-	mutable std::shared_mutex comprsChunkMapMutex;
-
 	ivec3 lastPlayerChunk = ivec3(0.0);
 
 	// multithreading //
+	std::thread worldWorker;
 	std::mutex readyQueueMutex;
     std::condition_variable readyCv;
-
-	// MAIN WORLD WORKER // 
-	ChunkState finalStep = ChunkState::Lighted;
-
-	std::thread worldWorker;
-
-	std::queue<WorldTask> tasks;
+	
+	std::queue<BlockCommand> blockCommands;
+	std::queue<std::function<void()>> tasks;
 
 	std::mutex taskQueueMutex;
 	std::condition_variable taskCv;
@@ -79,15 +65,22 @@ class Chunks {
 
 	// Neighbour methods //
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
-	Chunk* generateChunk(int x, int y, int z);
-
-	void finishChunk(std::shared_ptr<Chunk> chunk);
-	void generateChunk(std::shared_ptr<Chunk> chunk);
+	void updateChunk(std::shared_ptr<Chunk> chunk);
+	void updateLight(std::shared_ptr<Chunk> chunk);
+	void generate(std::shared_ptr<Chunk> chunk);
 
 	friend class BlockRenderer;
 	friend class ChunkMesher;
 public:
-	void pushTask(WorldTaskType task, std::variant<Pos, std::shared_ptr<Chunk>> var);
+	void pushTask(std::function<void()> task);
+
+	void generateChunk(int x, int y, int z);
+	void unloadChunk  (ChunkPtr chunk);
+	void destroyBlock (int x, int y, int z);
+	
+	//void destroyBlockLocally(int x, int y, int z);
+	//void createBlock(int x, int y, int z);
+	//void createBlockLocally(int x, int y, int z);
 
 	BasicLightSolver lightSolver;
 

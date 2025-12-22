@@ -47,7 +47,7 @@ public:
 };
 
 class BasicLightSolver {
-	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
+	
 
 	void processBoundaryBlockSingle(
 		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
@@ -73,6 +73,7 @@ class BasicLightSolver {
 		}
 	}
 public:
+	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
 	BasicLightSolver(Chunks* chunks);
 
 	/*

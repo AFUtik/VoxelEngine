@@ -19,7 +19,7 @@ struct LightEntry {
 	int32_t ly;
 	int32_t lz;
 	uint8_t light;
-	std::weak_ptr<Chunk> chunk;
+	Chunk *chunk;
 };
 
 #endif

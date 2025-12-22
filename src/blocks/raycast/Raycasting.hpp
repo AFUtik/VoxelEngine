@@ -8,9 +8,7 @@ class Chunks;
 
 struct BlockHit {
     bool hit = false;
-    int lx, ly, lz;
-    std::shared_ptr<Chunk> chunk;
-    block blockData;
+    int x, y, z;
 };
 
 extern BlockHit raycastBlock(const glm::dvec3& playerPos,

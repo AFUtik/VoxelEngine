@@ -57,7 +57,9 @@ enum class ChunkState : uint8_t {
 	Changed,
 	Lighted,
 	Finished,
-	Removed
+	Removed,
+
+	NeedsUpdate
 };
 
 class Chunk {
@@ -96,24 +98,13 @@ public:
 		state.store(new_state, std::memory_order_release);
 	}
 
-	// Basically we make dirty when terrain of a chunk is changed //
 	inline void dirty() {
 		version.fetch_add(1, std::memory_order_release);
-		state.store(ChunkState::Changed, std::memory_order_release);
+		state.store(ChunkState::NeedsUpdate, std::memory_order_release);
 	}
 
-	// Tells a chunk that the lighting has been changed and he needs to rework the model //
-	inline void light() {
-		version.fetch_add(1, std::memory_order_release);
-		state.store(ChunkState::Lighted, std::memory_order_release);
-	}
-
-	inline void light_hot() {state.store(ChunkState::Lighted, std::memory_order_relaxed);}
+	inline void dirtyHot() {state.store(ChunkState::NeedsUpdate, std::memory_order_relaxed);}
 	
-	inline void finish() {
-		state.store(ChunkState::Finished, std::memory_order_release);
-	}
-
 	inline void loadNeighbour(int ind, const std::shared_ptr<Chunk> &neigh) {
 		neighbors[ind]     = neigh;
 		rawNeighbours[ind] = neigh.get();
@@ -149,10 +140,6 @@ public:
 
 	inline const std::shared_ptr<Chunk>& getNeigbour(int ind) {
 		return neighbors[ind];
-	}
-
-	inline const Chunk* getRawNeigbour(int ind) {
-		return rawNeighbours[ind];
 	}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {
@@ -219,7 +206,11 @@ public:
 	uint8_t getLight(int32_t lx, int32_t, int32_t lz, int32_t channel) const;
 
 	void Chunk::setLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel, int32_t emission);
-
 };
+
+using ChunkPtr  = std::shared_ptr<Chunk>;
+using ChunkRef  = const std::shared_ptr<Chunk>&;
+using ChunkWeak = std::weak_ptr<Chunk>;
+using ChunkUPtr = std::unique_ptr<Chunk>;
 
 #endif
