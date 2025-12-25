@@ -1,27 +1,45 @@
 #ifndef LIGHTSOLVER_HPP_
 #define LIGHTSOLVER_HPP_
 
-#include "LightInfo.hpp"
-#include "../structures/RingBuffer.hpp"
 #include <memory>
 #include <cstdint>
 
+#include "LightInfo.hpp"
 #include "../blocks/Chunk.hpp"
-#include <map>
+#include "../blocks/ChunkInfo.hpp"
 
-class Chunks;
+template <typename T, size_t UPDATES>
+struct RingBuffer {
+private:
+    T buffer[UPDATES];
+    int head = 0, tail = 0;
+public:
+    inline void write(T entry) {
+        buffer[head] = entry;
+        head = (head + 1) % UPDATES;
+    }
+    inline T& read() {
+        T& entry = buffer[tail];
+        tail = (tail + 1) % UPDATES;
+        return entry;
+    }
+
+    inline bool empty() const {
+        return head == tail;
+    }
+};
+
+class LogicSystem;
 
 class LightSolver {
-	RingBuffer<LightEntry, 65536*2> addqueue;
-	RingBuffer<LightEntry, 65536*2> remqueue;
-	Chunks* chunks;
+	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> addqueue;
+	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> remqueue;
+	LogicSystem* chunks;
 	int channel;
-
-	
 
 	friend class BasicLightSolver;
 public:
-	LightSolver(Chunks* chunks, int channel);
+	LightSolver(LogicSystem* chunks, int channel);
 
 	/*
 	 * Adds light right in chunk without chunk finding.
@@ -74,7 +92,7 @@ class BasicLightSolver {
 	}
 public:
 	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
-	BasicLightSolver(Chunks* chunks);
+	BasicLightSolver(LogicSystem* chunks);
 
 	/*
 	 * Propagates light sun top to bottom.

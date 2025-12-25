@@ -19,3 +19,16 @@ struct Vertex {
     float u, v;
     float lr, lg, lb, ls;
 };
+
+#include <vector>
+struct VertexBuffer 
+{ 
+    std::vector<Vertex> vec; 
+    
+    VertexBuffer() {vec.reserve(4096);};
+
+    void clear() {
+        vec = std::vector<Vertex>();
+        vec.reserve(4096);
+    }
+};

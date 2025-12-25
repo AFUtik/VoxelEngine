@@ -14,7 +14,7 @@ void GlController::processAll() {
 
             if(!mesh || mesh->uploaded) continue;
 
-            mesh->vertices = mesh->buffer->vertices.get_size();
+            mesh->vertices = mesh->buffer->vec.size();
             mesh->verticesUpdated = mesh->vertices;
 
             glGenVertexArrays(1, &mesh->VAO);
@@ -22,7 +22,7 @@ void GlController::processAll() {
 
             glBindVertexArray(mesh->VAO);
             glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * VERTEX_SIZE * mesh->buffer->vertices.get_size(), mesh->buffer->vertices.get_data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * VERTEX_SIZE * mesh->buffer->vec.size(), mesh->buffer->vec.data(), GL_DYNAMIC_DRAW);
 
             // attributes
             uint32_t offset = 0;
@@ -37,25 +37,7 @@ void GlController::processAll() {
             glBindVertexArray(0);
             
             mesh->uploaded = true;
-        }
-    }
-    
-    {
-        std::lock_guard<std::mutex> lk(meshUpdateMutex);
-        while (!glUpdate.empty()) {
-            auto pr = glUpdate.front();
-            glUpdate.pop();
-
-            size_t size = sizeof(float) * VERTEX_SIZE * pr->verticesUpdated;
-
-            //std::lock_guard<std::mutex> l(pr->mutex);
-            glBindBuffer(GL_ARRAY_BUFFER, pr->VBO);
-            if(pr->verticesUpdated > pr->vertices) {
-                glBufferData(GL_ARRAY_BUFFER, size, pr->buffer->vertices.get_data(), GL_DYNAMIC_DRAW);
-                pr->vertices = pr->verticesUpdated;
-            } else {
-                glBufferSubData(GL_ARRAY_BUFFER, 0, size, pr->buffer->vertices.get_data());
-            }
+            mesh->buffer->clear();
         }
     }
 

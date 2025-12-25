@@ -1,11 +1,9 @@
 #include "LightSolver.hpp"
-#include "LightMap.hpp"
-#include "../blocks/Chunks.hpp"
 #include "../blocks/Chunk.hpp"
 #include "../blocks/Block.hpp" 
+#include "../LogicSystem.hpp"
 #include "LightInfo.hpp"
 
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -14,7 +12,7 @@ const int OFFS[6][3] = {
 	{0,0,1}, {0,0,-1}, {0,1,0}, {0,-1,0}, {1,0,0}, {-1,0,0}
 };
 
-LightSolver::LightSolver(Chunks* chunks, int channel) : chunks(chunks), channel(channel) {
+LightSolver::LightSolver(LogicSystem* chunks, int channel) : chunks(chunks), channel(channel) {
 }
 
 void LightSolver::addLocally(int x, int y, int z, uint8_t emission, const std::shared_ptr<Chunk>& chunk) {
@@ -127,7 +125,7 @@ void LightSolver::solve() {
 	}
 }
 
-BasicLightSolver::BasicLightSolver(Chunks* chunks) : 
+BasicLightSolver::BasicLightSolver(LogicSystem* chunks) : 
 	solverR(new LightSolver(chunks, 0)), 
 	solverB(new LightSolver(chunks, 1)), 
 	solverG(new LightSolver(chunks, 2)), 

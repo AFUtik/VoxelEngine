@@ -1,7 +1,5 @@
-#include <iostream>
 #include <numeric>
 #include <algorithm>
-#include <vector>
 
 #include "PerlinNoise.hpp"
 
@@ -12,29 +10,36 @@ PerlinNoise::PerlinNoise(uint64_t seed): seed(seed), gen(seed) {
     for(size_t i = 255; i < 512; i++) p[i] = p[i-255];
 }
 
-float PerlinNoise::noise(double x, double y) {
-    int X = static_cast<int>(floor(x)) & 255;
-    int Y = static_cast<int>(floor(y)) & 255;
+float PerlinNoise::noise(double x, double y)
+{
+    int X = static_cast<int>(std::floor(x)) & 255;
+    int Y = static_cast<int>(std::floor(y)) & 255;
 
-    x -= floor(x);
-    y -= floor(y);
+    x -= std::floor(x);
+    y -= std::floor(y);
 
     double u = fade(x);
     double v = fade(y);
 
-    const uint8_t aa = p[p[X] + Y];
-    const uint8_t ab = p[p[X] + Y + 1];
-    const uint8_t ba = p[p[X + 1] + Y];
-    const uint8_t bb = p[p[X + 1] + Y + 1];
+    int A  = p[X] + Y;
+    int B  = p[(X + 1) & 255] + Y;
 
-    return lerp(lerp(grad2(aa, x, y), grad2(ba, x - 1, y), u),
-                lerp(grad2(ab, x, y - 1), grad2(bb, x - 1, y - 1), u), v);
+    int aa = p[A & 255];
+    int ab = p[(A + 1) & 255];
+    int ba = p[B & 255];
+    int bb = p[(B + 1) & 255];
+
+    return lerp(
+        lerp(grad2(aa, x,     y),     grad2(ba, x - 1, y),     u),
+        lerp(grad2(ab, x, y - 1),     grad2(bb, x - 1, y - 1), u),
+        v
+    );
 }
 
 float PerlinNoise::noise(double x, double y, double z) {
-    const int xInd = static_cast<int>(std::floor(x)) & 255;
-    const int yInd = static_cast<int>(std::floor(y)) & 255;
-    const int zInd = static_cast<int>(std::floor(z)) & 255;
+    const int X = static_cast<int>(std::floor(x)) & 255;
+    const int Y = static_cast<int>(std::floor(y)) & 255;
+    const int Z = static_cast<int>(std::floor(z)) & 255;
 
     x -= std::floor(x);
     y -= std::floor(y);
@@ -44,12 +49,12 @@ float PerlinNoise::noise(double x, double y, double z) {
     const float v = fade(y);
     const float w = fade(z);
 
-    const std::uint8_t A =  p[xInd] + yInd;
-    const std::uint8_t AA = p[A] + zInd;
-    const std::uint8_t AB = p[A + 1] + zInd;
-    const std::uint8_t B =  p[xInd + 1] + yInd;
-    const std::uint8_t BA = p[B] + zInd;
-    const std::uint8_t BB = p[B + 1] + zInd;
+    const std::uint8_t A =  p[X] + Y;
+    const std::uint8_t AA = p[A] + Z;
+    const std::uint8_t AB = p[(A + 1) & 255] + Z;
+    const std::uint8_t B =  p[(X + 1) & 255] + Y;
+    const std::uint8_t BA = p[B] + Z;
+    const std::uint8_t BB = p[(B + 1) & 255] + Z;
 
     return lerp(
         lerp(
@@ -77,4 +82,16 @@ float PerlinNoise::detail(double x, double y, double z) {
     return total / max_amplitude;
 }
 
-float detail(double x, double y) {return 0.0f;}
+float PerlinNoise::detail(double x, double y) {
+    float total = 0.0;
+    float max_amplitude = 0.0;
+    float amplitude = 1.0;
+    float frequency = base_freq;
+    for (size_t i = 0; i < octaves; i++) {
+        total += amplitude * noise(x*frequency, y*frequency);
+        max_amplitude += amplitude;
+        amplitude *= persistance;
+        frequency *= lacunarity;
+    }
+    return total / max_amplitude;
+}

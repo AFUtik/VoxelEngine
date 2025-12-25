@@ -1,21 +1,19 @@
 #include "Raycasting.hpp"
-#include "../Chunks.hpp"
+#include "../../LogicSystem.hpp"
 
 BlockHit raycastBlock(const glm::dvec3& origin,
                       const glm::vec3& dir,
                       float maxDistance,
-                      Chunks* world)
+                      LogicSystem* world)
 {
-    glm::dvec3 pos = glm::floor(origin); // стартовая клетка
+    glm::dvec3 pos = glm::floor(origin);
     glm::ivec3 blockPos = glm::ivec3(pos);
 
-    // направление шага (-1 или +1 по каждой оси)
     glm::ivec3 step;
     step.x = (dir.x > 0) ? 1 : -1;
     step.y = (dir.y > 0) ? 1 : -1;
     step.z = (dir.z > 0) ? 1 : -1;
 
-    // расстояние до первой границы по каждой оси
     glm::dvec3 tMax;
     glm::dvec3 tDelta;
 
@@ -36,7 +34,6 @@ BlockHit raycastBlock(const glm::dvec3& origin,
     tDelta.z = (dir.z != 0.0) ? std::abs(1.0 / dir.z) : DBL_MAX;
 
     double dist = 0.0;
-
     
     while (dist <= maxDistance) {
         glm::ivec3 chunkCoord = worldToChunk3(blockPos);

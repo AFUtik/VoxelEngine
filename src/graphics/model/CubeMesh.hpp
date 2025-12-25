@@ -89,14 +89,17 @@ private:
         }}
     }};
 
+    
+
+public:
+
     static inline void applyLightFromSample(Vertex &v, const LightSample &ls, uint8_t corner) {
         v.lr = ls.r[corner];
         v.lg = ls.g[corner];
         v.lb = ls.b[corner];
         v.ls = ls.s[corner];
     }
-
-public:
+    
     template<direction DIR>
     void makeFace(VertexConsumer &consumer, const FaceInfo& info) {
         constexpr size_t dirIndex = static_cast<size_t>(DIR);

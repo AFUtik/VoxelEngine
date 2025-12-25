@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 #include "Renderer.hpp"
-#include <iostream>
+#include "graphics/Frustum.hpp"
 
 class DrawContext {
     std::unique_ptr<Renderer> renderer_sample;
@@ -16,7 +16,9 @@ class DrawContext {
     std::unordered_map<std::string, std::unique_ptr<Renderer>> renderers;
     std::vector<Renderer*> enabled_renderers;
 public:
-    DrawContext(Renderer* sample) : renderer_sample(sample) {}
+    DrawContext(Renderer* sample) : renderer_sample(sample) {
+
+    }
 
     template<typename T>
     void registerRenderer(std::string location, T* renderer) {

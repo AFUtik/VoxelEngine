@@ -4,17 +4,13 @@
 #include <memory>
 #include <mutex>
 
-#include "../Instance.hpp"
-#include "../vertex/VertexBuffer.hpp"
-
 #include "../vertex/VertexConsumer.hpp"
 
 class GlController;
 
 class Mesh {
-	GlController* glContoller;
-
 	std::shared_ptr<VertexBuffer> buffer;
+	GlController* glContoller;
 
 	bool uploaded = false;
 

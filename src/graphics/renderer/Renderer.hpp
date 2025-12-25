@@ -25,7 +25,7 @@ public:
     Renderer(Camera* camera, Shader* shader, Frustum* frustum) : camera(camera), shader(shader), frustum(frustum) {}
     
     Renderer() = default;
-
+    
     virtual void render() {};
 };
 

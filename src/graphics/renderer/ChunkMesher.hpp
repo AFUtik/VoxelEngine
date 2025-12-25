@@ -1,17 +1,13 @@
-//
-// Created by 280325 on 8/8/2025.
-//
-
 #ifndef CUBEMESHER_HPP
 #define CUBEMESHER_HPP
 
 #include <glm/glm.hpp>
 
 #include "Drawable.hpp"
-#include "../../blocks/Block.hpp"
-#include "../../blocks/Chunks.hpp"
-#include "../../blocks/ChunkInfo.hpp"
-#include "../../blocks/Chunk.hpp"
+#include "../../logic/blocks/Block.hpp"
+#include "../../logic/blocks/ChunkInfo.hpp"
+#include "../../logic/blocks/Chunk.hpp"
+#include "../../logic/LogicSystem.hpp"
 #include "../model/Mesh.hpp"
 #include "../model/CubeMesh.hpp"
 
@@ -19,9 +15,6 @@
 
 #include <memory>
 #include <mutex>
-#include <chrono>
-
-#include <iostream>
 
 class Mesher;
 
@@ -33,10 +26,10 @@ static const float Normals[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{
 
 class ChunkMesher {
     std::unique_ptr<GlController> glController;
-    Chunks* world;
+    LogicSystem* world;
 
     std::mutex meshUploadMutex;
-    std::queue<std::shared_ptr<Chunk>> meshUploadQueue;
+    std::queue<ChunkPtr> meshUploadQueue;
     std::condition_variable meshUploadCv;
     std::thread worker;
     bool stop = false;
@@ -123,7 +116,7 @@ class ChunkMesher {
 
     friend class BlockRenderer; 
 public:
-    ChunkMesher(Chunks* world) : glController(new GlController), world(world) {
+    ChunkMesher(LogicSystem* world) : glController(new GlController), world(world) {
         worker = std::thread([this, world] { meshWorkerThread(); });
     }
 
@@ -175,25 +168,20 @@ public:
     }
 
     inline void updateChunk(Chunk* chunk) {
-        auto mesh = chunk->chunk_draw.getSharedMesh();
+        auto mesh = chunk->drawable.getSharedMesh();
         if(!mesh) return; 
-        {
-            std::lock_guard<std::mutex> l(mesh->mutex);
-
-            VertexConsumer consumer = mesh->getConsumer();
-            for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
-                for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-                    for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-                        block vox = chunk->getBlock(x, y, z);
-                        unsigned int id = vox.id;
-
-                        if (!id) continue;
-                        makeCube(chunk, consumer, x, y, z, vox.id);
-                    }
+        VertexConsumer consumer = mesh->getConsumer();
+        for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
+            for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+                for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+                    block vox = chunk->getBlock(x, y, z);
+                    unsigned int id = vox.id;
+                    if (!id) continue;
+                    makeCube(chunk, consumer, x, y, z, vox.id);
                 }
             }
-            mesh->verticesUpdated = consumer.getIndex();
         }
+        mesh->verticesUpdated = consumer.getIndex();
         {
             std::lock_guard<std::mutex> lk(glController->meshUpdateMutex);
             glController->glUpdate.push(mesh);

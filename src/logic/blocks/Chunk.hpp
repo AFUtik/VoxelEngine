@@ -7,17 +7,15 @@
 
 #include "Block.hpp"
 
+// LOGIC
 #include "../lighting/LightMap.hpp"
-#include "../noise/PerlinNoise.hpp"
-#include "../graphics/renderer/Drawable.hpp"
 #include "../lighting/LightInfo.hpp"
-
 #include "ChunkCompressor.hpp"
 #include "ChunkInfo.hpp"
 #include "chunk_utils.hpp"
-#include "RenderInfo.hpp"
 
-#include <iostream>
+// GRAPHICS
+#include "../../graphics/renderer/Drawable.hpp"
 
 class Chunks;
 
@@ -30,16 +28,10 @@ struct ChunkPos {
 
 struct ChunkPosHash {
     std::size_t operator()(const ChunkPos& p) const noexcept {
-        // FNV-1a style mix (fast and decent)
-        uint64_t h = 14695981039346656037ull;
-        auto mix = [&](uint32_t v){
-            h ^= v;
-            h *= 1099511628211ull;
-        };
-        mix(static_cast<uint32_t>(p.x));
-        mix(static_cast<uint32_t>(p.y));
-        mix(static_cast<uint32_t>(p.z));
-        return static_cast<std::size_t>(h ^ (h >> 32));
+        std::size_t hx = std::hash<int32_t>{}(p.x);
+        std::size_t hy = std::hash<int32_t>{}(p.y);
+        std::size_t hz = std::hash<int32_t>{}(p.z);
+        return hx ^ (hy << 1) ^ (hz << 2);
     }
 };
 
@@ -68,7 +60,7 @@ class Chunk {
 
 	std::weak_ptr<Chunk> weak_self;
 
-	friend class Chunks;
+	friend class LogicSystem;
 	friend class ChunkCompressor;
 	friend class ChunkMesher;
 	friend class LightSolver;
@@ -77,16 +69,18 @@ class Chunk {
 	std::atomic<uint32_t> version;
 	
 	ChunkPos hash_pos;
-	glm::vec3 min;
-	glm::vec3 max;
+	
 public:
 	std::unique_ptr<Lightmap> lightmap;
 	std::unique_ptr<block[]> blocks;
+	
+	glm::vec3 min;
+	glm::vec3 max;
 
 	int32_t x, y, z;
 
 	mutable std::shared_mutex dataMutex;
-	DrawableObject chunk_draw;
+	DrawableObject drawable;
 
 	inline ChunkPos position() {return hash_pos;}
 
@@ -117,8 +111,10 @@ public:
 		}
 	}
 
-	// World Pos //
-	Chunk(int x, int y, int z) : x(x), y(y), z(z), hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {}
+	Chunk(int x, int y, int z) : x(x), y(y), z(z), 
+	min((x < 0 ? x-1 : x)*ChunkInfo::WIDTH, (y < 0 ?  y-1 : y)*ChunkInfo::HEIGHT, (z < 0 ? z : z-1)*ChunkInfo::DEPTH),
+	max((x < 0 ? x+1 : x)*ChunkInfo::WIDTH+ChunkInfo::WIDTH, (y < 0 ? y+1 : y)*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, (z < 0 ? z+1: z)*ChunkInfo::DEPTH+ChunkInfo::DEPTH), 
+	hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {}
 
 	/*
 	 * Transforms global coordinates into local coords.

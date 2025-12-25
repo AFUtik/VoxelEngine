@@ -1,15 +1,12 @@
 #ifndef VERTEXCONSUMER_HPP
 #define VERTEXCONSUMER_HPP
 
-#include "VertexBuffer.hpp"
+#include "VertexInfo.hpp"
 
 class VertexConsumer {
 	VertexBuffer* buffer;
 	uint32_t index = 0, index2 = 0;
 public:
-    //unsigned int ebo_index = 0;
-	//unsigned int vbo_index = 0;
-
 	inline uint32_t getIndex() {return index;}
 
     VertexConsumer(VertexBuffer* buffer) : buffer(buffer) {};

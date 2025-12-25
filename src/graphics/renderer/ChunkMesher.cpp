@@ -19,30 +19,20 @@ void ChunkMesher::meshWorkerThread() {
             }
             if(!sp) continue;
 
-            DrawableObject& draw = sp->chunk_draw;
+            DrawableObject& draw = sp->drawable;
 
             if(sp->checkState(ChunkState::Finished)) {
-                if(draw.getMesh()) {
-                    updateChunk(sp.get());
-                } else {
-                    std::shared_ptr<Mesh> mesh;
-                    {
-                        std::shared_lock<std::shared_mutex> wl(sp->dataMutex);
-                        mesh = makeChunk(sp.get());
-                    }
-                    
-                    if(mesh==nullptr) continue;
-
-                    {
-                        std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
-                        draw.loadMesh(mesh);
-                    }
-
-                    {
-                        std::unique_lock<std::mutex> wlock(meshUploadMutex);
-                        meshUploadQueue.push(sp);
-                    }
+                std::shared_ptr<Mesh> mesh = makeChunk(sp.get());
+                if(mesh==nullptr) continue;
+                {
+                    std::unique_lock<std::shared_mutex> wlock(sp->dataMutex);
+                    draw.loadMesh(mesh);
                 }
+                {
+                    std::unique_lock<std::mutex> wlock(meshUploadMutex);
+                    meshUploadQueue.push(sp);
+                }
+                
             }
             meshUploadCv.notify_one();
         }

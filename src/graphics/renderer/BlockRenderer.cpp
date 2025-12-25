@@ -1,27 +1,16 @@
-#include <iostream>
-
-#include "../../blocks/Chunk.hpp"
-#include "../../blocks/Block.hpp"
-#include "../model/Mesh.hpp"
-#include "../vertex/VertexBuffer.hpp"
-#include "../vertex/VertexConsumer.hpp"
-#include "../../blocks/Chunks.hpp"
-#include "../Shader.hpp"
 #include "BlockRenderer.hpp"
+
+#include "../Frustum.hpp"
+#include "../../logic/blocks/Chunk.hpp"
+#include "../../logic/blocks/ChunkInfo.hpp"
+#include "../../logic/LogicSystem.hpp"
+
+#include "../../graphics/Transform.hpp"
 
 #include <glm/ext.hpp>
 #include <memory>
-
-#include "../../lighting/LightMap.hpp"
-#include "../../graphics/Transform.hpp"
-#include "../../blocks/ChunkInfo.hpp"
-
-#include "../Frustum.hpp"
-#include "../../graphics/Camera.hpp"
-
 #include <mutex>
 #include <shared_mutex>
-
 
 void BlockRenderer::render() {
     std::vector<std::shared_ptr<Chunk>> toUpload;
@@ -38,21 +27,22 @@ void BlockRenderer::render() {
     for (auto &sp : toUpload) {
         if (!sp) continue;
         
-        auto mesh = sp->chunk_draw.getSharedMesh();
+        auto mesh = sp->drawable.getSharedMesh();
         if (!mesh) continue;
 
-        sp->chunk_draw.loadShader(shader);
+        sp->drawable.loadShader(shader);
         double px = double(sp->x) * double(ChunkInfo::WIDTH)  + 0.5;
         double py = double(sp->y) * double(ChunkInfo::HEIGHT) + 0.5;
         double pz = double(sp->z) * double(ChunkInfo::DEPTH)  + 0.5;
-        sp->chunk_draw.getTransform().setPosition(glm::dvec3(px, py, pz)); 
+        sp->drawable.getTransform().setPosition(glm::dvec3(px, py, pz)); 
     } 
 
     {
         std::shared_lock<std::shared_mutex> mapLock(world->chunkMapMutex);
         for (const auto& [chunkPos, chunk] : world->chunkMap) {
             if (!chunk) continue;
-            chunk->chunk_draw.draw(camera);
+
+            if(frustum->boxInFrustum(chunk->min, chunk->max)) chunk->drawable.draw(camera);
         }
     }
 }

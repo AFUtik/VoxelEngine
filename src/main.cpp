@@ -5,46 +5,37 @@
 
 #include "glm/ext/vector_double3.hpp"
 #include "graphics/Camera.hpp"
-#include "graphics/Frustum.hpp"
-#include "graphics/model/Mesh.hpp"
 #include "graphics/model/Texture.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/renderer/BlockRenderer.hpp"
 #include "graphics/renderer/DrawContext.hpp"
 
-#include "blocks/Block.hpp"
-#include "blocks/Chunk.hpp"
-#include "blocks/Chunks.hpp"
+#include "logic/lighting/LightSolver.hpp"
+#include "logic/blocks/raycast/Raycasting.hpp"
+#include "logic/LogicSystem.hpp"
 
 #include "graphics/renderer/DrawContext.hpp"
 #include "graphics/renderer/Renderer.hpp"
-#include "lighting/LightInfo.hpp"
-#include "lighting/LightMap.hpp"
-#include "lighting/LightSolver.hpp"
 
 #include "window/Window.hpp"
 #include "window/Events.hpp"
 
 #include "window/Texture_loader.hpp"
 
-#include "noise/PerlinNoise.hpp"
-
-#include "blocks/raycast/Raycasting.hpp"
-
-#include "glm/glm.hpp"
-#include "glm/ext.hpp"
-
 #include <chrono>
-#include <mutex>
-#include <shared_mutex>
+#include <memory>
 #include <thread>
 #include <filesystem>
 
 int WIDTH = 1920;
 int HEIGHT = 1080;
 
+template<typename T> using uptr = std::unique_ptr<T>;
+
 int main(int argc, char* argv[])
 {
+	
+
 	std::string absolute_path = std::filesystem::absolute(argv[0]).parent_path().string();
 
 	std::ios::sync_with_stdio(false);
@@ -53,33 +44,32 @@ int main(int argc, char* argv[])
 	Window::init(WIDTH, HEIGHT, "Test Window");
 	Events::init();
 
-	Shader* shader = load_shader(absolute_path + "\\res\\shaders\\core.vert", absolute_path + "\\res\\shaders\\core.frag");
+	uptr<Shader> shader = uptr<Shader>(load_shader(absolute_path + "\\res\\shaders\\core.vert", absolute_path + "\\res\\shaders\\core.frag"));
 	if (shader == nullptr) {
 		std::cerr << "failed to load shader" << std::endl;
 		Window::terminate();
 		return 1;
 	}
-
-	Texture* texture = load_texture(absolute_path + "\\res\\images\\block.png");
+	uptr<Texture> texture = uptr<Texture>(load_texture(absolute_path + "\\res\\images\\block.png"));
 	if (texture == nullptr) {
 		std::cerr << "failed to load texture" << std::endl;
-		delete texture;
 		Window::terminate();
 		return 1;
 	}
-
-	Chunks* world = new Chunks(5, 1, 5, true);
-
-	glClearColor(0.6f, 0.62f, 0.65f, 1);
 	
+	glClearColor(0.6f, 0.62f, 0.65f, 1);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	Camera* camera = new Camera(glm::dvec3(1, 0, 0), glm::radians(90.0f));
-	
-	Frustum* frustum = new Frustum;
+	LogicSystem* logic = new LogicSystem();
+
+	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(1, 0, 0), glm::radians(90.0f));
+	uptr<Frustum> frustum = std::make_unique<Frustum>();
+
+	DrawContext drawContext(new Renderer(camera.get(), shader.get(), frustum.get()));
+	drawContext.registerRenderer("world_renderer", new BlockRenderer(logic));
 
 	float camX = 0.0f;
 	float camY = 0.0f;
@@ -91,11 +81,6 @@ int main(int argc, char* argv[])
 	const double H = 1.0f / target_fps;
 
 	double timeAccu = 0.0f;
-
-	DrawContext drawContext(new Renderer(camera, shader, frustum));
-
-	BlockRenderer* brenderer = new BlockRenderer(world);
-	drawContext.registerRenderer("world_renderer", brenderer);
 
 	Events::toggle_cursor();
 	while (!Window::isShouldClose()) {
@@ -126,11 +111,13 @@ int main(int argc, char* argv[])
 			}
 			if (Events::jpressed(GLFW_KEY_H)) {
 				glm::ivec3 pos = worldToChunk3(camera->getPosition());
-				auto chunk = world->getChunk(pos.x, pos.y, pos.z);
+				auto chunk = logic->getChunk(pos.x, pos.y, pos.z);
 			}
 			if (Events::jpressed(GLFW_KEY_J)) {
-				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, world);
-				if(hit.hit) world->destroyBlock(hit.x, hit.y, hit.z);
+				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, logic);
+				if(hit.hit) logic->enqueueCommand([logic=logic, hit] {
+					logic->destroyBlock(hit.x, hit.y, hit.z);
+				});
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {
 				camera->setydir(glm::dvec3(0, 1, 0));
@@ -164,7 +151,6 @@ int main(int argc, char* argv[])
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			camera->originRebase();
-
 			shader->use();
 
 			glm::mat4 projview = camera->getProjection() * camera->updateView();
@@ -172,10 +158,9 @@ int main(int argc, char* argv[])
 			shader->uniformMatrix("projview", projview);
 			texture->bind();
 			
-			world->update(camera->getPosition());
+			logic->setPlayerPos(camera->getPosition());
 
-			//frustum->update(projview);
-
+			frustum->update(projview);
 			drawContext.render();
 
 			Window::swapBuffers();
@@ -187,12 +172,8 @@ int main(int argc, char* argv[])
         	std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
 		}
 	}
-	delete texture;
-	delete shader;
-	delete frustum;
 
-	delete camera;
-	delete world;
+	delete logic;
 
 	Window::terminate();
 	return 0;
