@@ -112,9 +112,11 @@ public:
 	}
 
 	Chunk(int x, int y, int z) : x(x), y(y), z(z), 
-	min((x < 0 ? x-1 : x)*ChunkInfo::WIDTH, (y < 0 ?  y-1 : y)*ChunkInfo::HEIGHT, (z < 0 ? z : z-1)*ChunkInfo::DEPTH),
-	max((x < 0 ? x+1 : x)*ChunkInfo::WIDTH+ChunkInfo::WIDTH, (y < 0 ? y+1 : y)*ChunkInfo::HEIGHT+ChunkInfo::HEIGHT, (z < 0 ? z+1: z)*ChunkInfo::DEPTH+ChunkInfo::DEPTH), 
-	hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {}
+	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
+	max((x+1)*ChunkInfo::WIDTH, (y+1)*ChunkInfo::HEIGHT, (z+1)*ChunkInfo::DEPTH), 
+	hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {
+
+	}
 
 	/*
 	 * Transforms global coordinates into local coords.

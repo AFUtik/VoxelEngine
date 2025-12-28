@@ -48,28 +48,26 @@ void LogicSystem::generate(ChunkPtr chunk)
 
     for (int z = 0; z < ChunkInfo::DEPTH; z++) {
         for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-
             int gx = x + chunk->x * (int)ChunkInfo::WIDTH;
             int gz = z + chunk->z * (int)ChunkInfo::DEPTH;
 
-            float h = sin(gx * scale) * cos(gz * scale);
+            float h = noise.detail(gx*scale, gz*scale);
             h = (h + 1.0f) * 0.5f;
 
             int groundY = static_cast<int>(h * height);
             int maxY = std::min(groundY + 65, (int)ChunkInfo::HEIGHT);
 
             for (int y = 0; y < maxY; y++) {
-
-                //int gy = y + chunk->y * ChunkInfo::HEIGHT;
+                int gy = y + chunk->y * ChunkInfo::HEIGHT;
 //
-                //float cave = noise.noise(
-                //    gx * scale2,
-                //    gy * scale2,
-                //    gz * scale2
-                //);
+                float cave = noise.noise(
+                    gx * scale2,
+                    gy * scale2,
+                    gz * scale2
+                );
 //
-                //int id = (cave > 0.4f) ? 0 : 1;
-                chunk->setBlock(x, y, z, 1);
+                int id = (cave > 0.4f) ? 0 : 1;
+                chunk->setBlock(x, y, z, id);
             }
         }
     }

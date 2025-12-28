@@ -4,7 +4,7 @@
 #include "../renderer/GlController.hpp"
 #include <mutex>
 
-Mesh::Mesh(GlController* glController) : glContoller(glController), buffer(std::make_shared<VertexBuffer>()) {
+Mesh::Mesh(GlController* glController) : glContoller(glController) {
 
 }
 
@@ -14,12 +14,7 @@ Mesh::Mesh(GlController* glController) : glContoller(glController), buffer(std::
 //}
 
 Mesh::~Mesh() {
-	if(uploaded) {
-		{
-			std::lock_guard<std::mutex> lk(glContoller->meshDeleteMutex);
-			glContoller->glDelete.push({VAO, VBO});
-		}
-	}
+	
 }
 
 void Mesh::update() {
@@ -33,6 +28,6 @@ void Mesh::update() {
 
 void Mesh::draw(unsigned int primitive) const {
 	glBindVertexArray(VAO);
-	glDrawArrays(GL_TRIANGLES, 0, verticesUpdated);
+	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 }

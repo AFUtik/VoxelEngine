@@ -9,6 +9,7 @@
 struct gl_delete_cmd {
     uint32_t vbo; 
     uint32_t vao;
+    uint32_t ebo;
 };
 
 struct gl_update_cmd {

@@ -14,7 +14,7 @@ class Frustum;
 
 class BlockRenderer : public Renderer {
 	LogicSystem* world;
-	ChunkMesher mesher;
+	Mesher mesher;
 public:
 	BlockRenderer(LogicSystem* chunks) : world(chunks), mesher(chunks) {}
 

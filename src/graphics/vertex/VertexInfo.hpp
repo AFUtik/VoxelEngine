@@ -17,7 +17,7 @@ static unsigned int ATTRIBUTES[] = {COORD_SIZE, TEX_COORD_SIZE, LIGHT_SIZE, 0};
 struct Vertex {
     float x, y, z;
     float u, v;
-    float lr, lg, lb, ls;
+    float lr = 0.0f, lg = 0.0f, lb = 0.0f, ls = 1.0f;
 };
 
 #include <vector>

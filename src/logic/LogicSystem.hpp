@@ -52,7 +52,7 @@ class LogicSystem {
 	// GEN //
 	MengerSpongeGenerator menger;
 	PerlinNoise noise;
-	int loadDistance = 6;
+	int loadDistance = 24;
 	
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
 	mutable std::shared_mutex chunkMapMutex;
@@ -78,7 +78,7 @@ class LogicSystem {
 	void generate(std::shared_ptr<Chunk> chunk);
 
 	friend class BlockRenderer;
-	friend class ChunkMesher;
+	friend class Mesher;
 
 	void processAllCommands();
 public:

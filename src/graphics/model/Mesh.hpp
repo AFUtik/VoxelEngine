@@ -4,33 +4,39 @@
 #include <memory>
 #include <mutex>
 
-#include "../vertex/VertexConsumer.hpp"
+#include "../vertex/VertexInfo.hpp"
 
 class GlController;
 
 class Mesh {
-	std::shared_ptr<VertexBuffer> buffer;
 	GlController* glContoller;
-
-	bool uploaded = false;
-
-	uint32_t VBO, VAO;
-	uint32_t vertices  = 0;
-	uint32_t verticesUpdated = 0;
-
+	
 	friend class GlController;
 	friend class ChunkMesher;
 public:
+	uint32_t VBO, VAO, EBO;
+	std::vector<Vertex> buffer;
+	std::vector<uint32_t> indices;
+	
+	bool uploaded = false;
+	
+	int vertices = 0; 
+
+	void clearBuffers() {
+		buffer  = std::vector<Vertex>();
+		//indices = std::vector<uint32_t>();
+
+		buffer.reserve(4096);
+		//indices.reserve(4096);
+	}
+
 	mutable std::mutex mutex;
 
-	Mesh(VertexBuffer* buffer) : buffer(buffer) {}
 	Mesh(GlController* glController);
 
 	~Mesh();
 
 	inline bool isUploaded() {return uploaded;}
-
-	inline VertexConsumer getConsumer() const {return VertexConsumer(buffer.get());}
 
 	void update();
 

@@ -9,118 +9,224 @@
 #include "../../logic/blocks/Chunk.hpp"
 #include "../../logic/LogicSystem.hpp"
 #include "../model/Mesh.hpp"
-#include "../model/CubeMesh.hpp"
 
 #include "GLController.hpp"
 
 #include <memory>
 #include <mutex>
+#include <unordered_map>
+#include <vector>
 
 class Mesher;
 
 using namespace glm;
+using namespace std;
 
-static const int Dirs[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0}};
+enum class FaceDirection {
+    POS_X,
+    NEG_X,
+    POS_Y,
+    NEG_Y,
+    POS_Z, 
+    NEG_Z
+};
 
-static const float Normals[6][3] = {{0,0,-1},{0,0,1},{0,-1,0},{0,1,0},{-1,0,0},{1,0,0}};
+struct VoxelFace {
+    FaceDirection faceDirection;
+    int block;
+    int minX, maxX;
+    int minY, maxY;
+    int minZ, maxZ;
+
+    struct Light {
+        float r[4];
+        float g[4];
+        float b[4];
+        float s[4];
+    } light;
+    
+    VoxelFace(FaceDirection fd, int block, int x, int y, int z) : 
+        faceDirection(fd), 
+        block(block), 
+        minX(x), maxX(x), minY(y), 
+        maxY(y), minZ(z), maxZ(z) {}
+
+    VoxelFace(const VoxelFace& a, const VoxelFace& b)
+    : faceDirection(a.faceDirection),
+      block(a.block),
+      minX(std::min(a.minX, b.minX)),
+      minY(std::min(a.minY, b.minY)),
+      minZ(std::min(a.minZ, b.minZ)),
+      maxX(std::max(a.maxX, b.maxX)),
+      maxY(std::max(a.maxY, b.maxY)),
+      maxZ(std::max(a.maxZ, b.maxZ)), light(a.light) {}
+
+    inline static bool checkCanCombineLight(VoxelFace &faceA, VoxelFace &faceB) {
+        if(glm::epsilonEqual(faceA.light.s[0]+faceA.light.s[1]+faceA.light.s[2]+faceA.light.s[3], faceB.light.s[0]+faceB.light.s[1]+faceB.light.s[2]+faceB.light.s[3], 1e-5f)) return false;
+        
+        return true;
+    }
+
+    template<FaceDirection FD> static bool canCombineZWise(VoxelFace &faceA, VoxelFace &faceB) {
+        if(faceA.block != faceB.block || faceA.faceDirection != faceB.faceDirection || checkCanCombineLight(faceA, faceB)) return false;
+
+        int faceAXLen = faceA.maxX - faceA.minX;
+        int faceAYLen = faceA.maxY - faceA.minY;
+        int faceAZLen = faceA.maxZ - faceA.minZ;
+
+        int faceBXLen = faceB.maxX - faceB.minX;
+        int faceBYLen = faceB.maxY - faceB.minY;
+        int faceBZLen = faceB.maxZ - faceB.minZ;
+
+        if(faceA.minZ == faceB.minZ) {
+            if(faceA.minY == faceB.minY) 
+            {
+                if(faceAZLen!=faceBZLen || faceAYLen!=faceBYLen) return false;
+                if(abs(faceA.minX + faceAXLen - faceB.minX) > 1 && abs(faceB.minX + faceBXLen - faceA.minX) > 1) return false;
+                return true;
+            }
+            if(faceA.minX == faceB.minX)
+            {
+                if(faceAXLen!=faceBXLen || faceAZLen!=faceBZLen) return false;
+                if(abs(faceA.minY + faceAYLen - faceB.minY) > 1 && abs(faceB.minY + faceBYLen - faceA.minY) > 1) return false;
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+
+
+struct BlockModelCube { 
+    Mesh* mesh;
+
+    void addFaceNXPlane(float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+    void addFaceXPlane (float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+    void addFaceNYPlane(float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+    void addFaceYPlane (float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+    void addFaceNZPlane(float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+    void addFaceZPlane (float x1, float y1, float z1, float x2, float y2, float z2, float u1, float v1, float u2, float v2, const VoxelFace::Light &l);
+
+    BlockModelCube(Mesh* mesh) : mesh(mesh) {}
+};
 
 class ChunkMesher {
-    std::unique_ptr<GlController> glController;
-    LogicSystem* world;
-
-    std::mutex meshUploadMutex;
-    std::queue<ChunkPtr> meshUploadQueue;
-    std::condition_variable meshUploadCv;
-    std::thread worker;
-    bool stop = false;
-    bool light_flag = true;
-
-    CubeMesher cubeMesher;
+    vector<VoxelFace>      y_faces [6];
+    unordered_map<size_t, vector<VoxelFace>> zx_faces[6];
+    BlockModelCube cubeModel;
+    Chunk* chunk;
 
     template<size_t Corner>
     inline void mix4_light(
-        Chunk* cur_chunk,
-        LightSample &lightSample,
+        VoxelFace &face,
         float cr, float cg, float cb, float cs,
         int x0, int y0, int z0,
         int x1, int y1, int z1,
         int x2, int y2, int z2
         ) {
-        lightSample.r[Corner] = (cur_chunk->getBoundLight(x0, y0, z0, 0) + cr * 30 + cur_chunk->getBoundLight(x1, y1, z1, 0) + cur_chunk->getBoundLight(x2, y2, z2, 0)) / 5.0f / 15.0f;
-        lightSample.g[Corner] = (cur_chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + cur_chunk->getBoundLight(x1, y1, z1, 1) + cur_chunk->getBoundLight(x2, y2, z2, 1)) / 5.0f / 15.0f;
-        lightSample.b[Corner] = (cur_chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + cur_chunk->getBoundLight(x1, y1, z1, 2) + cur_chunk->getBoundLight(x2, y2, z2, 2)) / 5.0f / 15.0f;
-        lightSample.s[Corner] = (cur_chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + cur_chunk->getBoundLight(x1, y1, z1, 3) + cur_chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
+        face.light.r[Corner] = (chunk->getBoundLight(x0, y0, z0, 0) + cr * 30 + chunk->getBoundLight(x1, y1, z1, 0) + chunk->getBoundLight(x2, y2, z2, 0)) / 5.0f / 15.0f;
+        face.light.g[Corner] = (chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + chunk->getBoundLight(x1, y1, z1, 1) + chunk->getBoundLight(x2, y2, z2, 1)) / 5.0f / 15.0f;
+        face.light.b[Corner] = (chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + chunk->getBoundLight(x1, y1, z1, 2) + chunk->getBoundLight(x2, y2, z2, 2)) / 5.0f / 15.0f;
+        face.light.s[Corner] = (chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + chunk->getBoundLight(x1, y1, z1, 3) + chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
     }
 
-    template<direction DIR>
-    inline void makeFace(
-        Chunk* cur_chunk,
-        VertexConsumer &consumer,
-        int x, int y, int z,
-        float u1, float v1,
-        float u2, float v2) {
-        constexpr int dx = direction::EAST  == DIR ? 1 : direction::WEST  == DIR ? -1 : 0;
-        constexpr int dy = direction::UP    == DIR ? 1 : direction::DOWN  == DIR ? -1 : 0;
-        constexpr int dz = direction::NORTH == DIR ? 1 : direction::SOUTH == DIR ? -1 : 0;
-
-        float lr = cur_chunk->getBoundLight(x+dx, y+dy, z+dz, 0) / 15.0f;
-        float lg = cur_chunk->getBoundLight(x+dx, y+dy, z+dz, 1) / 15.0f;
-        float lb = cur_chunk->getBoundLight(x+dx, y+dy, z+dz, 2) / 15.0f;
-        float ls = cur_chunk->getBoundLight(x+dx, y+dy, z+dz, 3) / 15.0f;
-
-        FaceInfo faceInfo;
-        LightSample &lightSample = faceInfo.lightSample;
-
-        faceInfo.x = x;
-        faceInfo.y = y;
-        faceInfo.z = z;
-
-        faceInfo.u1 = u1;
-        faceInfo.u2 = u2;
-        faceInfo.v1 = v1;
-        faceInfo.v2 = v2;
-
-        if constexpr (DIR == direction::UP) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z, x-1,y+1,z-1, x,y+1,z-1);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z, x-1,y+1,z+1, x,y+1,z+1);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z, x+1,y+1,z+1, x,y+1,z+1);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z, x+1,y+1,z-1, x,y+1,z-1);
-        } else if constexpr (DIR == direction::DOWN) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z, x-1,y-1,z-1, x,y-1,z-1);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z, x-1,y-1,z+1, x,y-1,z+1);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z, x+1,y-1,z+1, x,y-1,z+1);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z, x+1,y-1,z-1, x,y-1,z-1);
-        } else if constexpr (DIR == direction::EAST) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z-1, x+1,y,z-1, x+1,y-1,z);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z-1, x+1,y,z-1, x+1,y+1,z);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z+1, x+1,y,z+1, x+1,y+1,z);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z+1, x+1,y,z+1, x+1,y-1,z);
-        } else if constexpr (DIR == direction::WEST) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z-1, x-1,y,z-1, x-1,y-1,z);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z-1, x-1,y,z-1, x-1,y+1,z);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z+1, x-1,y,z+1, x-1,y+1,z);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z+1, x-1,y,z+1, x-1,y-1,z);
-        } else if constexpr (DIR == direction::NORTH) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z+1, x,y-1,z+1, x-1,y,z+1);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z+1, x,y+1,z+1, x-1,y,z+1);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z+1, x,y+1,z+1, x+1,y,z+1);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z+1, x,y-1,z+1, x+1,y,z+1);
-        } else if constexpr (DIR == direction::SOUTH) {
-            mix4_light<0>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y-1,z-1, x,y-1,z-1, x-1,y,z-1);
-            mix4_light<1>(cur_chunk, lightSample, lr, lg, lb, ls, x-1,y+1,z-1, x,y+1,z-1, x-1,y,z-1);
-            mix4_light<2>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y+1,z-1, x,y+1,z-1, x+1,y,z-1);
-            mix4_light<3>(cur_chunk, lightSample, lr, lg, lb, ls, x+1,y-1,z-1, x,y-1,z-1, x+1,y,z-1);
+    template<FaceDirection FD> inline void addFace(int block, int x, int y, int z) 
+    {
+        constexpr int dx = FaceDirection::POS_X  == FD ? 1 : FaceDirection::NEG_X  == FD ? -1 : 0;
+        constexpr int dy = FaceDirection::POS_Y  == FD ? 1 : FaceDirection::NEG_Y  == FD ? -1 : 0;
+        constexpr int dz = FaceDirection::POS_Z  == FD ? 1 : FaceDirection::NEG_Z  == FD ? -1 : 0;
+        float lr = chunk->getBoundLight(x+dx, y+dy, z+dz, 0) / 15.0f;
+        float lg = chunk->getBoundLight(x+dx, y+dy, z+dz, 1) / 15.0f;
+        float lb = chunk->getBoundLight(x+dx, y+dy, z+dz, 2) / 15.0f;
+        float ls = chunk->getBoundLight(x+dx, y+dy, z+dz, 3) / 15.0f;
+        VoxelFace curFace(FD, block, x, y, z);
+        if constexpr (FD == FaceDirection::POS_Y) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x-1,y+1,z, x-1,y+1,z-1, x,y+1,z-1);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x-1,y+1,z, x-1,y+1,z+1, x,y+1,z+1);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z, x+1,y+1,z+1, x,y+1,z+1);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y+1,z, x+1,y+1,z-1, x,y+1,z-1);
+        } else if constexpr (FD == FaceDirection::NEG_Y) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x-1,y-1,z, x-1,y-1,z-1, x,y-1,z-1);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x-1,y-1,z, x-1,y-1,z+1, x,y-1,z+1);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y-1,z, x+1,y-1,z+1, x,y-1,z+1);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z, x+1,y-1,z-1, x,y-1,z-1);
+        } else if constexpr (FD == FaceDirection::POS_X) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x+1,y-1,z-1, x+1,y,z-1, x+1,y-1,z);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x+1,y+1,z-1, x+1,y,z-1, x+1,y+1,z);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z+1, x+1,y,z+1, x+1,y+1,z);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z+1, x+1,y,z+1, x+1,y-1,z);
+        } else if constexpr (FD == FaceDirection::NEG_X) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x-1,y-1,z-1, x-1,y,z-1, x-1,y-1,z);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x-1,y+1,z-1, x-1,y,z-1, x-1,y+1,z);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x-1,y+1,z+1, x-1,y,z+1, x-1,y+1,z);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x-1,y-1,z+1, x-1,y,z+1, x-1,y-1,z);
+        } else if constexpr (FD == FaceDirection::POS_Z) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x-1,y-1,z+1, x,y-1,z+1, x-1,y,z+1);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x-1,y+1,z+1, x,y+1,z+1, x-1,y,z+1);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z+1, x,y+1,z+1, x+1,y,z+1);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z+1, x,y-1,z+1, x+1,y,z+1);
+        } else if constexpr (FD == FaceDirection::NEG_Z) {
+            mix4_light<0>(curFace, lr, lg, lb, ls, x-1,y-1,z-1, x,y-1,z-1, x-1,y,z-1);
+            mix4_light<1>(curFace, lr, lg, lb, ls, x-1,y+1,z-1, x,y+1,z-1, x-1,y,z-1);
+            mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z-1, x,y+1,z-1, x+1,y,z-1);
+            mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z-1, x,y-1,z-1, x+1,y,z-1);
         }
-        cubeMesher.makeFace<DIR>(consumer, faceInfo);
+        
+        if constexpr (FD==FaceDirection::NEG_Y || FD==FaceDirection::POS_Y) {
+            vector<VoxelFace> &faces = y_faces[static_cast<size_t>(FD)];
+            bool added = false;
+            if (!faces.empty()) {
+                VoxelFace& last = faces.back();
+                if (VoxelFace::canCombineZWise<FD>(last, curFace)) {
+                    faces.back() = VoxelFace(last, curFace);
+                    added = true;
+                }
+            }
+            if (!added) faces.push_back(curFace);
+        } else {
+            unordered_map<size_t, vector<VoxelFace>> &mfaces = zx_faces[static_cast<size_t>(FD)];
+            size_t key = (static_cast<size_t>(z) << 32) | x;
+            vector<VoxelFace>& faces = mfaces[key];
+            bool added = false;
+            if(!faces.empty()) {
+                VoxelFace& last = faces.back();
+                if (VoxelFace::canCombineZWise<FD>(last, curFace)) {
+                    faces.back() = VoxelFace(last, curFace);
+                    added = true;
+                }
+            } 
+            if(!added) faces.push_back(curFace);
+        }
+        
     }
+
+    void addCube(int block, int lx, int ly, int lz);
+public:
+    void make();
+
+    ChunkMesher(Chunk* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
+        for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
+    }
+};
+
+class Mesher {
+    std::unique_ptr<GlController> glController;
+    LogicSystem* world;
+
+    std::mutex meshUploadMutex;
+    std::queue<std::pair<ChunkPtr, std::shared_ptr<Mesh>>> meshUploadQueue;
+    std::condition_variable meshUploadCv;
+    std::thread worker;
+    bool stop = false;
 
     friend class BlockRenderer; 
 public:
-    ChunkMesher(LogicSystem* world) : glController(new GlController), world(world) {
+    Mesher(LogicSystem* world) : glController(new GlController), world(world) {
         worker = std::thread([this, world] { meshWorkerThread(); });
     }
 
-    ~ChunkMesher() {
+    ~Mesher() {
         {
             std::lock_guard<std::mutex> lk(world->readyQueueMutex);
             stop = true;
@@ -130,69 +236,7 @@ public:
             worker.join();
     }
 
-    inline void makeCube(Chunk* cur_chunk, VertexConsumer &consumer, int lx, int ly, int lz, uint8_t id)
-    {
-        float uvsize = 1.0f / 16.0f;
-        float u1 = (id % 16) * uvsize;
-        float v1 = 1 - ((1 + id / 16) * uvsize);
-        float u2 = u1 + uvsize;
-        float v2 = v1 + uvsize;
-        
-        if (!cur_chunk->getBoundBlock(lx, ly+1, lz).isOpaque()) makeFace<direction::UP>(cur_chunk, consumer, lx, ly, lz, u1, v1, u2, v2);  // UP
-        if (!cur_chunk->getBoundBlock(lx, ly-1, lz).isOpaque()) makeFace<direction::DOWN>(cur_chunk, consumer,  lx, ly, lz, u1, v1, u2, v2); // DOWN
-        if (!cur_chunk->getBoundBlock(lx+1, ly, lz).isOpaque()) makeFace<direction::EAST>(cur_chunk, consumer, lx, ly, lz, u1, v1, u2, v2); // EAST
-        if (!cur_chunk->getBoundBlock(lx-1, ly, lz).isOpaque()) makeFace<direction::WEST>(cur_chunk, consumer,  lx, ly, lz, u1, v1, u2, v2); // WEST
-        if (!cur_chunk->getBoundBlock(lx, ly, lz+1).isOpaque()) makeFace<direction::NORTH>(cur_chunk, consumer,  lx, ly, lz, u1, v1, u2, v2); // NORTH
-        if (!cur_chunk->getBoundBlock(lx, ly, lz-1).isOpaque()) makeFace<direction::SOUTH>(cur_chunk, consumer, lx, ly, lz, u1, v1, u2, v2); // SOUTH
-    }
-
-    inline std::shared_ptr<Mesh> makeChunk(Chunk* chunk) {
-        auto mesh = std::make_shared<Mesh>(glController.get());
-        VertexConsumer consumer = mesh->getConsumer();
-        for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
-            for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-                for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-                    block vox = chunk->getBlock(x, y, z);
-                    unsigned int id = vox.id;
-
-                    if (!id) continue;
-                    makeCube(chunk, consumer, x, y, z, vox.id);
-                }
-            }
-        }
-        {
-            std::lock_guard<std::mutex> lk(glController->meshUploadMutex);
-            glController->glUpload.push(mesh);
-        }
-        return mesh;
-    }
-
-    inline void updateChunk(Chunk* chunk) {
-        auto mesh = chunk->drawable.getSharedMesh();
-        if(!mesh) return; 
-        VertexConsumer consumer = mesh->getConsumer();
-        for (int y = 0; y < ChunkInfo::HEIGHT; y++) {
-            for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-                for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-                    block vox = chunk->getBlock(x, y, z);
-                    unsigned int id = vox.id;
-                    if (!id) continue;
-                    makeCube(chunk, consumer, x, y, z, vox.id);
-                }
-            }
-        }
-        mesh->verticesUpdated = consumer.getIndex();
-        {
-            std::lock_guard<std::mutex> lk(glController->meshUpdateMutex);
-            glController->glUpdate.push(mesh);
-        }
-    }
-
     void meshWorkerThread();
-
-    inline void modifyCube() {}
-
-    inline void set_light(bool flag) {light_flag = flag;}
 };
 
 #endif //CUBEMESHER_HPP

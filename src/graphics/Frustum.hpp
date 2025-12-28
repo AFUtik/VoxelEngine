@@ -7,7 +7,6 @@ struct Plane {
     glm::vec3 normal;
     float d;
 
-    // проверка, точка слева или справа от плоскости
     float distance(const glm::vec3& point) const {
         return glm::dot(normal, point) + d;
     }
@@ -15,13 +14,20 @@ struct Plane {
 
 class Frustum {
 public:
-    Plane planes[6]; // left, right, top, bottom, near, far
+    Plane planes[6];
 
     void update(const glm::mat4& m) {
         glm::vec4 row0 = glm::vec4(m[0][0], m[1][0], m[2][0], m[3][0]);
         glm::vec4 row1 = glm::vec4(m[0][1], m[1][1], m[2][1], m[3][1]);
         glm::vec4 row2 = glm::vec4(m[0][2], m[1][2], m[2][2], m[3][2]);
         glm::vec4 row3 = glm::vec4(m[0][3], m[1][3], m[2][3], m[3][3]);
+
+        glm::vec4 left   = row3 + row0;
+        glm::vec4 right  = row3 - row0;
+        glm::vec4 bottom = row3 + row1;
+        glm::vec4 top    = row3 - row1;
+        glm::vec4 near   = row3 + row2;
+        glm::vec4 far    = row3 - row2;
 
         auto setPlane = [&](int i, const glm::vec4& p) {
             planes[i].normal = glm::vec3(p.x, p.y, p.z);
@@ -31,17 +37,12 @@ public:
             planes[i].d /= len;
         };
 
-        glm::vec4 col0 = m[0];
-        glm::vec4 col1 = m[1];
-        glm::vec4 col2 = m[2];
-        glm::vec4 col3 = m[3];
-
-        setPlane(0, col3 + col0); // left
-        setPlane(1, col3 - col0); // right
-        setPlane(2, col3 + col1); // bottom
-        setPlane(3, col3 - col1); // top
-        setPlane(4, col3 + col2); // near
-        setPlane(5, col3 - col2); // far
+        setPlane(0, left);
+        setPlane(1, right);
+        setPlane(2, bottom);
+        setPlane(3, top);
+        setPlane(4, near);
+        setPlane(5, far);
     }
 
     bool pointInFrustum(const glm::vec3& point) const {
@@ -57,7 +58,7 @@ public:
             if (planes[i].normal.x >= 0) p.x = max.x;
             if (planes[i].normal.y >= 0) p.y = max.y;
             if (planes[i].normal.z >= 0) p.z = max.z;
-            if (planes[i].distance(p) < -0.00001f) return false;
+            if (planes[i].distance(p) < -1e-4f) return false;
         }
         return true;
     }
