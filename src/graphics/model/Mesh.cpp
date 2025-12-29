@@ -14,7 +14,12 @@ Mesh::Mesh(GlController* glController) : glContoller(glController) {
 //}
 
 Mesh::~Mesh() {
-	
+	if(uploaded) {
+		{
+			std::lock_guard<std::mutex> lk(glContoller->meshDeleteMutex);
+			glContoller->glDelete.push({VBO, VAO, EBO});
+		}
+	}
 }
 
 void Mesh::update() {

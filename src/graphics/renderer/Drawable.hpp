@@ -22,18 +22,18 @@ class Camera;
 
 class DrawableObject {
 protected:
-    std::shared_ptr<Mesh> mesh;
     Transform transform;
-
+    
 public:
     mutable std::shared_mutex meshMutex;
+    std::shared_ptr<Mesh> mesh;
     Shader* shader = nullptr;
     
     DrawableObject() : mesh(nullptr) {}
     
     inline Transform& getTransform() {return transform;}
 
-    void loadMesh(const std::shared_ptr<Mesh> &mesh);
+    void loadMesh(std::shared_ptr<Mesh> mesh);
     void unloadMesh();
 
     inline Mesh* getMesh() {return mesh.get();}

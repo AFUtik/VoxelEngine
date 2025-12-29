@@ -22,15 +22,6 @@ class Mesher;
 using namespace glm;
 using namespace std;
 
-enum class FaceDirection {
-    POS_X,
-    NEG_X,
-    POS_Y,
-    NEG_Y,
-    POS_Z, 
-    NEG_Z
-};
-
 struct VoxelFace {
     FaceDirection faceDirection;
     int block;
@@ -112,10 +103,11 @@ struct BlockModelCube {
 };
 
 class ChunkMesher {
-    vector<VoxelFace>      y_faces [6];
+    vector<VoxelFace> y_faces [6];
     unordered_map<size_t, vector<VoxelFace>> zx_faces[6];
+
     BlockModelCube cubeModel;
-    Chunk* chunk;
+    ChunkSnapshot* chunk;
 
     template<size_t Corner>
     inline void mix4_light(
@@ -205,7 +197,7 @@ class ChunkMesher {
 public:
     void make();
 
-    ChunkMesher(Chunk* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
+    ChunkMesher(ChunkSnapshot* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
         for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
     }
 };
@@ -216,7 +208,6 @@ class Mesher {
 
     std::mutex meshUploadMutex;
     std::queue<std::pair<ChunkPtr, std::shared_ptr<Mesh>>> meshUploadQueue;
-    std::condition_variable meshUploadCv;
     std::thread worker;
     bool stop = false;
 

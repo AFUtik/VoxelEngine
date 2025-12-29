@@ -23,9 +23,6 @@ void BlockRenderer::render() {
             auto &chunk = pr.first;
             auto &mesh  = pr.second;
 
-            auto prevMesh = chunk->drawable.getSharedMesh();
-            
-            
             glGenVertexArrays(1, &mesh->VAO);
             glGenBuffers(1, &mesh->VBO);
             
@@ -57,28 +54,18 @@ void BlockRenderer::render() {
 
             chunk->drawable.loadMesh(mesh);
             toUpload.push_back(chunk);
-            
-            if(prevMesh && prevMesh->isUploaded()) {
-                glDeleteVertexArrays(1, &prevMesh->VAO);
-                glDeleteBuffers(1, &prevMesh->VBO);
-                glDeleteBuffers(1, &prevMesh->EBO);
-            }
         }
     }
-    //mesher.glController->processAll();
+    mesher.glController->processAll();
 
     for (auto &sp : toUpload) {
         if (!sp) continue;
-        
-        auto mesh = sp->drawable.getSharedMesh();
-        if (!mesh) continue;
-
         sp->drawable.loadShader(shader);
         double px = double(sp->x) * double(ChunkInfo::WIDTH);
         double py = double(sp->y) * double(ChunkInfo::HEIGHT);
         double pz = double(sp->z) * double(ChunkInfo::DEPTH);
         sp->drawable.getTransform().setPosition(glm::dvec3(px, py, pz)); 
-    } 
+    }
 
     {
         std::shared_lock<std::shared_mutex> mapLock(world->chunkMapMutex);

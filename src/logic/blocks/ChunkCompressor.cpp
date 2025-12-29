@@ -47,3 +47,41 @@ std::shared_ptr<Chunk> ChunkCompressor::decompress(const std::shared_ptr<ChunkCo
     LightCompressor::decompress(chunk->lightmap.get(), rle->lightCompression);
     return chunk;
 }
+
+std::shared_ptr<DataCompressedRLE> ChunkCompressor::compress(block* blocks, Lightmap* lightmap) {
+    auto dataRLE = std::make_shared<DataCompressedRLE>();
+    int16_t count = 0;
+    uint8_t cid = 0;
+
+    for (int i = 0; i < ChunkInfo::VOLUME; i++) {
+        uint8_t id = blocks[i].id;
+        if (id == cid) {
+            count++;
+        } else {
+            dataRLE->rle.push_back(BlockCompression{count, cid});
+
+            count = 1;
+            cid = id;
+        }
+    }
+    
+    dataRLE->rle.push_back(BlockCompression{count, cid});
+    LightCompressor::compress(lightmap, dataRLE->lightCompression);
+    return dataRLE;
+}
+
+void ChunkCompressor::decompress(DataCompressedRLE *dataRLE, block* blocks, Lightmap* lightmap) {
+    int16_t offset = 0;
+    for (auto &[length, id] : dataRLE->rle) {
+        if (id==0) {
+            offset += length;
+            continue;
+        }
+
+        block *start = blocks+offset;
+
+        std::fill(start, start+length, block{id});
+        offset += length;
+    }
+    LightCompressor::decompress(lightmap, dataRLE->lightCompression);
+}

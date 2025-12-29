@@ -1,6 +1,7 @@
 #ifndef FRUSTUM_HPP
 #define FRUSTUM_HPP
 
+#include "Camera.hpp"
 #include <glm/glm.hpp>
 
 struct Plane {
@@ -13,9 +14,12 @@ struct Plane {
 };
 
 class Frustum {
+    Camera* camera;
 public:
-    Plane planes[6];
+    Frustum(Camera* camera) : camera(camera) {};
 
+    Plane planes[6];
+    
     void update(const glm::mat4& m) {
         glm::vec4 row0 = glm::vec4(m[0][0], m[1][0], m[2][0], m[3][0]);
         glm::vec4 row1 = glm::vec4(m[0][1], m[1][1], m[2][1], m[3][1]);
@@ -52,7 +56,10 @@ public:
         return true;
     }
 
-    bool boxInFrustum(const glm::vec3& min, const glm::vec3& max) const {
+    bool boxInFrustum(glm::vec3 min, glm::vec3 max) const {
+        min -= vec3(camera->getWorldShift());
+        max -= vec3(camera->getWorldShift());
+
         for (int i = 0; i < 6; i++) {
             glm::vec3 p = min;
             if (planes[i].normal.x >= 0) p.x = max.x;

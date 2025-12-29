@@ -12,12 +12,12 @@ class MengerSpongeGenerator {
     {
         while (x || y || z)
         {
-            if ((x % 3 == 1 && y % 3 == 1) ||
-                (x % 3 == 1 && z % 3 == 1) ||
-                (y % 3 == 1 && z % 3 == 1))
+            if ((x % 2 == 1 && y % 2 == 1) ||
+                (x % 2 == 1 && z % 2 == 1) ||
+                (y % 2 == 1 && z % 2 == 1))
                 return false;
 
-            x /= 3; y /= 3; z /= 3;
+            x /= 2; y /= 2; z /= 2;
         }
         return true;
     }

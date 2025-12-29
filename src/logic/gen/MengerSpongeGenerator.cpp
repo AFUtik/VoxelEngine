@@ -7,7 +7,7 @@ MengerSpongeGenerator::MengerSpongeGenerator(int size, int iterations) {
     for(int y = 0; y < 54; y++) 
     {
         bool solid = isMengerBlockFast(x, y, z);
-        if(solid) fractal.setBlock(x, y, z, solid);
+        if(solid) fractal.setBlock(x, y, z, 3);
     }
 }
 
@@ -20,7 +20,7 @@ void MengerSpongeGenerator::generate(ChunkPtr ptr) {
         int gy = abs((y+ptr->y*ChunkInfo::HEIGHT)%54);
         int gz = abs((z+ptr->z*ChunkInfo::DEPTH )%54);
  
-        bool solid = fractal.getBlock(gx, gy, gz).id;
+        int solid = fractal.getBlock(gx, gy, gz).id;
         if(solid) ptr->setBlock(x, y, z, solid);
     }
 }

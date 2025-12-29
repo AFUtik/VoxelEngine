@@ -50,15 +50,25 @@ enum class ChunkState : uint8_t {
 	Lighted,
 	Finished,
 	Removed,
-
+	Compressed,
 	NeedsUpdate
 };
 
-class Chunk {
-	std::shared_ptr<Chunk> neighbors[26];
-	Chunk* rawNeighbours[26] {nullptr};
+enum class FaceDirection {
+    POS_X,
+    NEG_X,
+    POS_Y,
+    NEG_Y,
+    POS_Z, 
+    NEG_Z
+};
 
-	std::weak_ptr<Chunk> weak_self;
+const int FACES_ARRAY[] = {
+	13, 12, 21, 4, 15, 10
+};
+
+class Chunk {
+	Chunk* neighbors[26] {nullptr};
 
 	friend class LogicSystem;
 	friend class ChunkCompressor;
@@ -70,6 +80,7 @@ class Chunk {
 	
 	ChunkPos hash_pos;
 	
+	std::shared_ptr<DataCompressedRLE> compressed;
 public:
 	std::unique_ptr<Lightmap> lightmap;
 	std::unique_ptr<block[]> blocks;
@@ -99,24 +110,35 @@ public:
 
 	inline void dirtyHot() {state.store(ChunkState::NeedsUpdate, std::memory_order_relaxed);}
 	
-	inline void loadNeighbour(int ind, const std::shared_ptr<Chunk> &neigh) {
-		neighbors[ind]     = neigh;
-		rawNeighbours[ind] = neigh.get();
+	inline void loadNeighbour(int ind, Chunk *neigh) {
+		neighbors[ind] = neigh;
+	}    
+
+	Chunk(int x, int y, int z) : x(x), y(y), z(z),
+		min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
+		max((x+1)*ChunkInfo::WIDTH, (y+1)*ChunkInfo::HEIGHT, (z+1)*ChunkInfo::DEPTH), 
+		hash_pos({x, y, z}), 
+		blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), 
+		lightmap(new Lightmap) 
+	{
+
 	}
 
-	inline void clearNeighbours() {
+	~Chunk() {
 		for(int i = 0; i < 26; i++) {
-			neighbors[i].reset();
-			rawNeighbours[i] = nullptr;
+			if(neighbors[i]) neighbors[i]->neighbors[25-i] = nullptr;
 		}
 	}
+	
+	/*
+	 * Compresses chunk in RLE data.
+	 */
+	void compress(bool toDelete=true);
 
-	Chunk(int x, int y, int z) : x(x), y(y), z(z), 
-	min(x*ChunkInfo::WIDTH, y*ChunkInfo::HEIGHT, z*ChunkInfo::DEPTH),
-	max((x+1)*ChunkInfo::WIDTH, (y+1)*ChunkInfo::HEIGHT, (z+1)*ChunkInfo::DEPTH), 
-	hash_pos({x, y, z}), blocks(std::make_unique<block[]>(ChunkInfo::VOLUME)), lightmap(new Lightmap) {
-
-	}
+	/*
+	 * Compresses chunk in RLE data.
+	 */
+	void decompress(bool toDelete=true);
 
 	/*
 	 * Transforms global coordinates into local coords.
@@ -136,8 +158,22 @@ public:
 		gz = z + chunk->z * ChunkInfo::DEPTH;
 	}
 
-	inline const std::shared_ptr<Chunk>& getNeigbour(int ind) {
+	inline Chunk* getNeigbour(int ind) {
 		return neighbors[ind];
+	}
+
+	template<FaceDirection FD> 
+	inline Chunk* getNeighbourByFace() {
+		if constexpr(FD==FaceDirection::POS_X) return neighbors[13]; 
+		else if constexpr(FD==FaceDirection::NEG_X) return neighbors[12]; 
+		else if constexpr(FD==FaceDirection::POS_Y) return neighbors[15]; 
+		else if constexpr(FD==FaceDirection::NEG_Y) return neighbors[10]; 
+		else if constexpr(FD==FaceDirection::POS_Z) return neighbors[21]; 
+		else if constexpr(FD==FaceDirection::NEG_Z) return neighbors[4]; 
+	}
+	
+	inline Chunk* getNeigbourByFace(int face) {
+		return neighbors[FACES_ARRAY[face]];
 	}
 
 	inline int getNeighbourIndex(int lx, int ly, int lz) const {
@@ -147,17 +183,6 @@ public:
 
 		if (dx == 0 && dy == 0 && dz == 0) return -1;
 		return NEI_INDEX_BY_ENCODE[ encode3(dx, dy, dz) ];
-	}
-
-	inline Chunk* getNeigbourByFace(int face) {
-		int idx = faceToIdx(face);
-        if (idx < 0) return nullptr;
-
-		return neighbors[face].get();
-	}
-
-	inline const std::shared_ptr<Chunk>& getSharedNeigbourByFace(int face) {
-		return neighbors[faceToIdx(face)];
 	}
 
 	/*
@@ -173,7 +198,7 @@ public:
 			return this;
 		}
 		int idx = getNeighbourIndex(bx, by, bz);
-    	return neighbors[idx].get();
+    	return neighbors[idx];
 	}
 
 	inline block getBoundBlock(int32_t lx, int32_t ly, int32_t lz) {
@@ -196,14 +221,153 @@ public:
 	}
 
    	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
-
-	inline void setBlock(int32_t lx, int32_t ly, int32_t lz, uint8_t id) const {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
+	inline void  setBlock(int32_t lx, int32_t ly, int32_t lz, uint8_t id) const {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
 
 	uint8_t getBoundLight(int lx, int ly, int lz, int channel);
-
 	uint8_t getLight(int32_t lx, int32_t, int32_t lz, int32_t channel) const;
 
 	void Chunk::setLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel, int32_t emission);
+};
+
+/*
+ * 
+ */
+class ChunkSnapshot { 
+	block blocks[ChunkInfo::VOLUME];
+
+    block border_z[2][ChunkInfo::HEIGHT * ChunkInfo::WIDTH]; // 0 = -Z, 1 = +Z
+    block border_x[2][ChunkInfo::HEIGHT * ChunkInfo::DEPTH]; // 0 = -X, 1 = +X
+
+    uint16_t light[ChunkInfo::VOLUME] {0};
+
+    uint16_t light_border_z[2][ChunkInfo::HEIGHT * ChunkInfo::WIDTH] {0};
+    uint16_t light_border_x[2][ChunkInfo::HEIGHT * ChunkInfo::DEPTH] {0};
+
+    uint16_t light_border_diag[4][ChunkInfo::HEIGHT] {0};
+public:
+	std::shared_ptr<Chunk> source;
+
+    ChunkSnapshot(std::shared_ptr<Chunk> src) : source(src) {
+		constexpr int W = ChunkInfo::WIDTH; constexpr int H = ChunkInfo::HEIGHT; constexpr int D = ChunkInfo::DEPTH;
+
+		std::copy_n(src->blocks.get(), ChunkInfo::VOLUME, blocks);
+		std::copy_n(src->lightmap->map, ChunkInfo::VOLUME, light);
+
+		Chunk* nXpos = src->getNeighbourByFace<FaceDirection::POS_X>();
+		Chunk* nXneg = src->getNeighbourByFace<FaceDirection::NEG_X>();
+		
+		Chunk* nZpos = src->getNeighbourByFace<FaceDirection::POS_Z>();
+		Chunk* nZneg = src->getNeighbourByFace<FaceDirection::NEG_Z>();
+
+		// -Z (z = 0)
+		if (nZneg) {
+			for (int y = 0; y < H; ++y) {
+				std::copy_n(
+					&nZneg->blocks[(y * D + (D - 1)) * W],
+					W,
+					&border_z[0][y * W]
+				);
+				std::copy_n(
+					&nZneg->lightmap->map[(y * D + (D - 1)) * W],
+					W,
+					&light_border_z[0][y * W]
+				);
+			}
+		}
+
+		// +Z
+		if (nZpos) {
+			for (int y = 0; y < H; ++y) {
+				std::copy_n(
+					&nZpos->blocks[(y * D + 0) * W],
+					W,
+					&border_z[1][y * W]
+				);
+				std::copy_n(
+					&nZpos->lightmap->map[(y * D + 0) * W],
+					W,
+					&light_border_z[1][y * W]
+				);
+			}
+		}
+
+		if (nXneg) {
+			for (int y = 0; y < H; ++y) {
+				for (int z = 0; z < D; ++z) {
+					border_x[0][y * D + z] = nXneg->blocks[(y * D + z) * W + (W - 1)];
+					light_border_x[0][y * D + z] = nXneg->lightmap->map[(y * D + z) * W + (W - 1)];
+				}
+			}
+		}
+
+		if (nXpos) {
+			for (int y = 0; y < H; ++y) {
+				for (int z = 0; z < D; ++z) {
+        			border_x[1][y * D + z] = nXpos->blocks[(y * D + z) * W + 0];
+					light_border_x[1][y * D + z] = nXpos->lightmap->map[(y * D + z) * W + 0];
+    			}
+			}
+		}
+
+		for (int y = 0; y < H; ++y) {
+			light_border_diag[0][y] = src->getLight(0,     y, 0,     0); // -X -Z
+			light_border_diag[1][y] = src->getLight(0,     y, D - 1, 0); // -X +Z
+			light_border_diag[2][y] = src->getLight(W - 1, y, 0,     0); // +X -Z
+			light_border_diag[3][y] = src->getLight(W - 1, y, D - 1, 0); // +X +Z
+		}
+	}
+
+	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
+
+	inline block getBoundBlock(int32_t lx, int32_t ly, int32_t lz) const {
+		constexpr int W = ChunkInfo::WIDTH;
+		constexpr int H = ChunkInfo::HEIGHT;
+		constexpr int D = ChunkInfo::DEPTH;
+		if (lx >= 0 && lx < W &&
+			ly >= 0 && ly < H &&
+			lz >= 0 && lz < D)
+		{
+			return blocks[(ly * D + lz) * W + lx];
+		}
+		if (lx < 0) {
+			return border_x[0][ly * D + lz];
+		}
+		else if (lx >= W) {
+			return border_x[1][ly * D + lz];
+		}
+		if (lz < 0) {
+			return border_z[0][ly * W + lx];
+		}
+		else if (lz >= D) {
+			return border_z[1][ly * W + lx];
+		}
+		return block{};
+	}
+
+	inline uint8_t getBoundLight(int32_t lx, int32_t ly, int32_t lz, int32_t channel) const {
+		constexpr int W = ChunkInfo::WIDTH;
+		constexpr int H = ChunkInfo::HEIGHT;
+		constexpr int D = ChunkInfo::DEPTH;
+		if (lx >= 0 && lx < W &&
+			ly >= 0 && ly < H &&
+			lz >= 0 && lz < D)
+		{
+			return (light[(ly * D + lz) * W + lx] >> (channel * 4)) & 0xF;
+		}
+		if (lx < 0 && lz >= 0 && lz < D) {
+			return (light_border_x[0][ly * D + lz] >> (channel * 4)) & 0xF;
+		}
+		if (lx >= W && lz >= 0 && lz < D) {
+			return (light_border_x[1][ly * D + lz] >> (channel * 4)) & 0xF;
+		}
+		if (lz < 0 && lx >= 0 && lx < W) {
+			return (light_border_z[0][ly * W + lx] >> (channel * 4)) & 0xF;
+		}
+		if (lz >= D && lx >= 0 && lx < W) {
+			return (light_border_z[1][ly * W + lx] >> (channel * 4)) & 0xF;
+		}
+		return 0;
+	}
 };
 
 using ChunkPtr  = std::shared_ptr<Chunk>;

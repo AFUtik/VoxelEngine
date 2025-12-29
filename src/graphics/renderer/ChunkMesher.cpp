@@ -234,7 +234,7 @@ void ChunkMesher::make() {
 
 void Mesher::meshWorkerThread() {
     while (true) {
-            std::shared_ptr<Chunk> sp;
+            std::unique_ptr<ChunkSnapshot> snap;
             {
                 std::unique_lock lk(world->readyQueueMutex);
                 world->readyCv.wait(lk, [&] {
@@ -243,23 +243,20 @@ void Mesher::meshWorkerThread() {
                 if (stop && world->readyChunks.empty())
                     break;
 
-                sp = world->readyChunks.front();
+                snap = std::move(world->readyChunks.front());
                 world->readyChunks.pop();
             }
-            if(!sp) continue;
+            std::shared_ptr<Chunk> org = snap->source;
 
-            DrawableObject& draw = sp->drawable;
-
-            if(sp->checkState(ChunkState::Finished)) {
+            if(!org) continue;
+            if(org->checkState(ChunkState::Finished)) {
                 auto mesh = make_shared<Mesh>(glController.get());
-                ChunkMesher chunkMesher(sp.get(), mesh.get());
-                chunkMesher.make();
-                
+                ChunkMesher chunkMesher(snap.get(), mesh.get());
+                chunkMesher.make(); 
                 {
                     std::unique_lock<std::mutex> wlock(meshUploadMutex);
-                    meshUploadQueue.push({sp, mesh});
+                    meshUploadQueue.push({org, mesh});
                 }
             }
-            meshUploadCv.notify_one();
         }
     }

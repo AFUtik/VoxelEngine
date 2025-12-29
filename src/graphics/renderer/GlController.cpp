@@ -9,18 +9,6 @@
 
 void GlController::processAll() {
     {
-        std::lock_guard<std::mutex> lk(meshDeleteMutex);
-        while (!glDelete.empty()) {
-            gl_delete_cmd pr = glDelete.front();
-            glDelete.pop();
-
-            glDeleteVertexArrays(1, &pr.vao);
-            glDeleteBuffers(1, &pr.vbo);
-            glDeleteBuffers(1, &pr.ebo);
-        }
-    }
-    
-    {
         std::lock_guard<std::mutex> lk(meshUploadMutex);
         while (!glUpload.empty()) {
             auto mesh = glUpload.front();
@@ -58,6 +46,16 @@ void GlController::processAll() {
             mesh->clearBuffers();
         }
     }
-
     
+    {
+        std::lock_guard<std::mutex> lk(meshDeleteMutex);
+        while (!glDelete.empty()) {
+            gl_delete_cmd pr = glDelete.front();
+            glDelete.pop();
+
+            glDeleteVertexArrays(1, &pr.vao);
+            glDeleteBuffers(1, &pr.vbo);
+            glDeleteBuffers(1, &pr.ebo);
+        }
+    }
 }

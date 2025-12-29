@@ -10,6 +10,7 @@
 #include "graphics/renderer/BlockRenderer.hpp"
 #include "graphics/renderer/DrawContext.hpp"
 
+#include "logic/blocks/chunk_utils.hpp"
 #include "logic/lighting/LightSolver.hpp"
 #include "logic/blocks/raycast/Raycasting.hpp"
 #include "logic/LogicSystem.hpp"
@@ -24,6 +25,7 @@
 
 #include <chrono>
 #include <memory>
+#include <regex>
 #include <thread>
 #include <filesystem>
 
@@ -34,7 +36,12 @@ template<typename T> using uptr = std::unique_ptr<T>;
 
 int main(int argc, char* argv[])
 {
-	
+	std::cout << "+x" << " " << neighbourIndexFromDelta(1, 0, 0) << std::endl;
+	std::cout << "-x" << " " << neighbourIndexFromDelta(-1, 0, 0) << std::endl;
+	std::cout << "+y" << " " << neighbourIndexFromDelta(0, 1, 0) << std::endl;
+	std::cout << "-y" << " " << neighbourIndexFromDelta(0, -1, 0) << std::endl;
+	std::cout << "+z" << " " << neighbourIndexFromDelta(0, 0, 1) << std::endl;
+	std::cout << "-z" << " " << neighbourIndexFromDelta(0, 0, -1) << std::endl;
 
 	std::string absolute_path = std::filesystem::absolute(argv[0]).parent_path().string();
 
@@ -66,7 +73,7 @@ int main(int argc, char* argv[])
 	LogicSystem* logic = new LogicSystem();
 
 	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(1, 0, 0), glm::radians(90.0f));
-	uptr<Frustum> frustum = std::make_unique<Frustum>();
+	uptr<Frustum> frustum = std::make_unique<Frustum>(camera.get());
 
 	DrawContext drawContext(new Renderer(camera.get(), shader.get(), frustum.get()));
 	drawContext.registerRenderer("world_renderer", new BlockRenderer(logic));

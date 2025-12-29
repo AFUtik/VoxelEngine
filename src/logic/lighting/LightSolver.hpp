@@ -47,7 +47,7 @@ public:
 	 * @param y local
 	 * @param z local
 	 */
-	void addLocally(int x, int y, int z, const std::shared_ptr<Chunk>& chunk);
+	void addLocally(int x, int y, int z, Chunk* chunk);
 
 	/*
 	 * Adds light with specified emission right in chunk without chunk finding.
@@ -55,11 +55,11 @@ public:
 	 * @param y local
 	 * @param z local
 	 */
-	void addLocally(int x, int y, int z, uint8_t emission, const std::shared_ptr<Chunk>& chunk);
+	void addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk);
 
 	void remove(int x, int y, int z);
 
-	void removeLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
+	void removeLocally(int lx, int ly, int lz, Chunk* chunk);
 
 	void solve();
 };
@@ -68,19 +68,19 @@ class BasicLightSolver {
 	
 
 	void processBoundaryBlockSingle(
-		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
+		Chunk* A, Chunk* B,
 		int ax, int ay, int az,
 		int face,
 		std::array<bool,4> &addedAny);
 	
 	void processBoundaryBlock(
-		const std::shared_ptr<Chunk>& A, const std::shared_ptr<Chunk>& B,
+		Chunk* A, Chunk* B,
 		int ax, int ay, int az,
 		int bx, int by, int bz,
 		std::array<bool, 4> &addedAny);
 
 	void syncBoundaryWithNeigbour(
-		const std::shared_ptr<Chunk>& chunk, const std::shared_ptr<Chunk>& neighbor,
+		Chunk* chunk, Chunk* neighbor,
 		int dir, std::array<bool, 4> &addedAny);
 		
 	inline LightSolver* getSolver(int chan) {
@@ -98,22 +98,22 @@ public:
 	 * Propagates light sun top to bottom.
 	 * @param chunk
 	 */
-	void propagateSunLight(const std::shared_ptr<Chunk>& chunk);
+	void propagateSunLight(Chunk* chunk);
 
 	/*
 	 * Propagates light sun top to bottom.
 	 * @param chunk
 	 */
-	void propagateSunRay(int lx, int lz, const std::shared_ptr<Chunk>& chunk);
+	void propagateSunRay(int lx, int lz, Chunk* chunk);
 
 	/*
 	 * Calculates light for chunks and neighbours around it.
 	 */
-	void calculateLight(const std::shared_ptr<Chunk>& chunk);
+	void calculateLight(Chunk* chunk);
 
-	void removeLightLocally(int lx, int ly, int lz, const std::shared_ptr<Chunk> &chunk);
+	void removeLightLocally(int lx, int ly, int lz, Chunk* chunk);
 	
-	void placeLightLocally(int lx, int ly, int lz, Emission emission, const std::shared_ptr<Chunk> &chunk);
+	void placeLightLocally(int lx, int ly, int lz, Emission emission, Chunk* chunk);
 };
 
 #endif /* LIGHTSOLVER_HPP */

@@ -1,6 +1,8 @@
 
 #include "LogicSystem.hpp"
 #include <atomic>
+#include <memory>
+#include <chrono>
 
 using namespace glm;
 
@@ -22,7 +24,6 @@ LogicSystem::~LogicSystem() {
 }
 
 void LogicSystem::loadNeighbours(std::shared_ptr<Chunk> chunk) {
-    chunk->weak_self = chunk;
     for (int i = 0; i < 26; ++i) {
         int nx = chunk->x + OFFSETS[i][0];
         int ny = chunk->y + OFFSETS[i][1];
@@ -32,9 +33,8 @@ void LogicSystem::loadNeighbours(std::shared_ptr<Chunk> chunk) {
         if (it != chunkMap.end()) {
             auto& neigh = it->second;
 
-            std::scoped_lock lock(chunk->dataMutex, neigh->dataMutex);
-            chunk->loadNeighbour(i,    neigh);
-            neigh->loadNeighbour(25-i, chunk);
+            chunk->loadNeighbour(i,    neigh.get());
+            neigh->loadNeighbour(25-i, chunk.get());
         }
     }
 }
@@ -74,14 +74,11 @@ void LogicSystem::generate(ChunkPtr chunk)
 }
 
 void LogicSystem::updateChunk(ChunkPtr chunk) {
-    bool needNotify = false;
-    if (chunk->state.load(std::memory_order_acquire) != ChunkState::Finished) {
-        chunk->setState(ChunkState::Finished);
-        needNotify = true;
-    }
-    if (needNotify) {
+    auto snapshot = std::make_unique<ChunkSnapshot>(chunk);
+    {
         std::lock_guard lk(readyQueueMutex);
-        readyChunks.push(chunk);
+        readyChunks.push(std::move(snapshot));
+        chunk->setState(ChunkState::Finished);
         readyCv.notify_one();
     }
 }
@@ -98,13 +95,12 @@ void LogicSystem::generateChunk(int x, int y, int z) {
             auto it = chunkMap.find({x, y, z});
             if (it != chunkMap.end()) return;
         }
-        
         ChunkPtr chunk = std::make_shared<Chunk>(x, y, z);
         generate(chunk);
         loadNeighbours(chunk);
     
-        lightSolver.propagateSunLight(chunk);
-        lightSolver.calculateLight(chunk);
+        lightSolver.propagateSunLight(chunk.get());
+        lightSolver.calculateLight(chunk.get());
         
         chunkMap.emplace(chunk->position(), chunk);
         
@@ -117,7 +113,6 @@ void LogicSystem::unloadChunk(ChunkPtr chunk) {
             auto it = chunkMap.find(chunk->hash_pos);
             if (it == chunkMap.end()) return;
         }
-        chunk->clearNeighbours();
         {
             std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
             chunkMap.erase(chunk->hash_pos);
@@ -126,19 +121,17 @@ void LogicSystem::unloadChunk(ChunkPtr chunk) {
 }
 
 void LogicSystem::destroyBlock(int x, int y, int z) {
+    auto chunk = getChunkByBlock(x, y, z);
+    int lx, ly, lz;
+    Chunk::local(lx, ly, lz, x, y, z);
 
+    std::cout << chunk->x << " " << chunk->y << " " << chunk->z << " " << std::endl;
 
-        auto chunk = getChunkByBlock(x, y, z);
-        int lx, ly, lz;
-        Chunk::local(lx, ly, lz, x, y, z);
+    chunk->setBlock(lx, ly, lz, 0); 
+    lightSolver.removeLightLocally(lx, ly, lz, chunk.get());
 
-        std::cout << chunk->x << " " << chunk->y << " " << chunk->z << " " << std::endl;
-
-        chunk->setBlock(lx, ly, lz, 0); 
-        lightSolver.removeLightLocally(lx, ly, lz, chunk);
-
-        chunk->dirty();
-        updateChunk(chunk);
+    chunk->dirty();
+    updateChunk(chunk);
 }
 
 block LogicSystem::getBlock(int x, int y, int z) {
@@ -227,15 +220,25 @@ void LogicSystem::logicUpdate(double dt) {
     {
         std::shared_lock sl(chunkMapMutex);
         for (auto& [pos, chunk] : chunkMap) {
-            if (!insideRadius(playerChunk, pos, loadDistance))
+            if (!insideRadius(playerChunk, pos, loadDistance)) 
+            {
                 toUnload.push_back(chunk);
-            else if(chunk->checkState(ChunkState::NeedsUpdate)) updateChunk(chunk);
+            }
+
+            //if (chunk->checkState(ChunkState::Finished) && !insideRadius(playerChunk, pos, 1)) chunk->compress();
+            ////else chunk->decompress();
+            
+            if(chunk->checkState(ChunkState::NeedsUpdate)) 
+            {
+                updateChunk(chunk);
+            }
         }
     }
 
-    for (auto& chunk : toUnload)
+    for (auto& chunk : toUnload) {
         unloadChunk(chunk);
-
+    }
+        
 	if (playerChunk != lastPlayerChunk) {
 		for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
             for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
