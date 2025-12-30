@@ -336,7 +336,7 @@ void BasicLightSolver::placeLightLocally(int lx, int ly, int lz, Emission emissi
 		solverB->solve();
 	}
 	if(emission.s) {
-		propagateSunRay(lx, lz, chunk);
+		//propagateSunRay(lx, lz, chunk);
 
 		solverS->addLocally(lx, ly, lz, emission.s, chunk);
 		solverS->solve();

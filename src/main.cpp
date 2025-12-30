@@ -21,7 +21,7 @@
 #include "window/Window.hpp"
 #include "window/Events.hpp"
 
-#include "window/Texture_loader.hpp"
+#include "loaders/Texture_loader.hpp"
 
 #include <chrono>
 #include <memory>
@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
 			if (Events::jpressed(GLFW_KEY_J)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, logic);
 				if(hit.hit) logic->enqueueCommand([logic=logic, hit] {
-					logic->destroyBlock(hit.x, hit.y, hit.z);
+					logic->placeBlock(hit.x, hit.y + 1, hit.z);
 				});
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {

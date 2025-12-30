@@ -13,7 +13,9 @@ LogicSystem::LogicSystem() : noise(0), menger(81, 3), lightSolver(this)  {
 	noise.octaves = 2;
     noise.base_freq = 1.0f;
     //noise.lacunarity = 1.2f;
+
     logicThread = std::thread([this] { logicLoop(); });
+    workerThread = std::thread([this] { workerThreadLoop(); });
 }
 
 LogicSystem::~LogicSystem() {
@@ -21,6 +23,9 @@ LogicSystem::~LogicSystem() {
 
     if (logicThread.joinable())
         logicThread.join();
+
+    if (workerThread.joinable())
+        workerThread.join();
 }
 
 void LogicSystem::loadNeighbours(std::shared_ptr<Chunk> chunk) {
@@ -46,39 +51,34 @@ void LogicSystem::generate(ChunkPtr chunk)
     const float scale2 = 0.04f;
     const int   height = 40;
 
-    for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-        for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-            int gx = x + chunk->x * (int)ChunkInfo::WIDTH;
-            int gz = z + chunk->z * (int)ChunkInfo::DEPTH;
+    for (int z = 0; z < ChunkInfo::DEPTH;  z++) 
+    for (int x = 0; x < ChunkInfo::WIDTH;  x++) 
+    for (int y = 0; y < ChunkInfo::HEIGHT; y++) 
+    {
+        int gx = x + chunk->x * (int)ChunkInfo::WIDTH;
+        int gz = z + chunk->z * (int)ChunkInfo::DEPTH;
+        int gy = y + chunk->y * (int)ChunkInfo::HEIGHT;
 
-            float h = noise.detail(gx*scale, gz*scale);
-            h = (h + 1.0f) * 0.5f;
-
-            int groundY = static_cast<int>(h * height);
-            int maxY = std::min(groundY + 65, (int)ChunkInfo::HEIGHT);
-
-            for (int y = 0; y < maxY; y++) {
-                int gy = y + chunk->y * ChunkInfo::HEIGHT;
-//
-                float cave = noise.noise(
-                    gx * scale2,
-                    gy * scale2,
-                    gz * scale2
-                );
-//
-                int id = (cave > 0.4f) ? 0 : 1;
-                chunk->setBlock(x, y, z, id);
-            }
-        }
+        float n = noise.noise(
+            gx * scale2,
+            gy * scale2,
+            gz * scale2
+        );
+        int id = 0;
+        if(n>0.3f) id = 1;
+        if(id) chunk->setBlock(x, y, z, id);
     }
+            
+        
+    
 }
 
 void LogicSystem::updateChunk(ChunkPtr chunk) {
+    chunk->setState(ChunkState::Finished);
     auto snapshot = std::make_unique<ChunkSnapshot>(chunk);
     {
         std::lock_guard lk(readyQueueMutex);
-        readyChunks.push(std::move(snapshot));
-        chunk->setState(ChunkState::Finished);
+        readyChunks.push_front(std::move(snapshot));
         readyCv.notify_one();
     }
 }
@@ -107,17 +107,16 @@ void LogicSystem::generateChunk(int x, int y, int z) {
         updateChunk(chunk);
 }
 
-void LogicSystem::unloadChunk(ChunkPtr chunk) {
-        {
-            std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
-            auto it = chunkMap.find(chunk->hash_pos);
-            if (it == chunkMap.end()) return;
-        }
-        {
-            std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
-            chunkMap.erase(chunk->hash_pos);
-        }
-        chunk->setState(ChunkState::Removed);
+void LogicSystem::unloadChunk(int cx, int cy, int cz) {
+    {
+        std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
+        auto it = chunkMap.find({cx, cy, cz});
+        if (it == chunkMap.end()) return;
+    }
+    {
+        std::unique_lock<std::shared_mutex> mapLock(chunkMapMutex);
+        chunkMap.erase(ChunkPos{cx, cy, cz});
+    }
 }
 
 void LogicSystem::destroyBlock(int x, int y, int z) {
@@ -129,6 +128,20 @@ void LogicSystem::destroyBlock(int x, int y, int z) {
 
     chunk->setBlock(lx, ly, lz, 0); 
     lightSolver.removeLightLocally(lx, ly, lz, chunk.get());
+
+    chunk->dirty();
+    updateChunk(chunk);
+}
+
+void LogicSystem::placeBlock(int x, int y, int z) {
+    auto chunk = getChunkByBlock(x, y, z);
+    int lx, ly, lz;
+    Chunk::local(lx, ly, lz, x, y, z);
+
+    std::cout << chunk->x << " " << chunk->y << " " << chunk->z << " " << std::endl;
+
+    chunk->setBlock(lx, ly, lz, 1);
+    lightSolver.placeLightLocally(lx, ly, lz, {0, 0, 15, 15}, chunk.get());
 
     chunk->dirty();
     updateChunk(chunk);
@@ -212,6 +225,31 @@ void LogicSystem::processAllCommands() {
     }
 }
 
+void LogicSystem::workerThreadLoop() {
+    while(running) {
+        std::function<void()> task;
+        {
+            std::unique_lock lk(taskQueueMutex);
+            taskCv.wait(lk, [&] {
+                return !running || !tasks.empty();
+            });
+            if (!running && tasks.empty())
+                break;
+            task = std::move(tasks.front());
+            tasks.pop();
+        }
+        task();
+    }
+}
+
+void LogicSystem::pushTask(std::function<void()> task) {
+    {
+        std::unique_lock<std::mutex> m(taskQueueMutex);
+        tasks.push(task);
+    }
+    taskCv.notify_one();
+}
+
 void LogicSystem::logicUpdate(double dt) {
     processAllCommands();
 
@@ -223,7 +261,7 @@ void LogicSystem::logicUpdate(double dt) {
             if (!insideRadius(playerChunk, pos, loadDistance)) 
             {
                 toUnload.push_back(chunk);
-            }
+            } 
 
             //if (chunk->checkState(ChunkState::Finished) && !insideRadius(playerChunk, pos, 1)) chunk->compress();
             ////else chunk->decompress();
@@ -235,15 +273,13 @@ void LogicSystem::logicUpdate(double dt) {
         }
     }
 
-    for (auto& chunk : toUnload) {
-        unloadChunk(chunk);
-    }
+    for (auto& chunk : toUnload) unloadChunk(chunk->x, chunk->y, chunk->z);
         
 	if (playerChunk != lastPlayerChunk) {
 		for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
             for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
                 //for (int y = playerChunk.y - loadDistance; y <= playerChunk.y + loadDistance; y++) {
-                    generateChunk(x, 0, z);
+                    if(commandQueue.empty()) generateChunk(x, 0, z); 
                 //}
             }
         }

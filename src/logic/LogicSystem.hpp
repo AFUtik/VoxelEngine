@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <mutex>
 #include <condition_variable>
+#include <set>
 #include <queue>
 #include <glm/glm.hpp>
 
@@ -37,6 +38,10 @@ struct BlockCommand {
 	int newId;
 };
 
+struct ChunkCommand {
+	int x, y, z;
+};
+
 typedef ChunkPos Pos;
 
 template<typename T>
@@ -52,7 +57,7 @@ class LogicSystem {
 	// GEN //
 	MengerSpongeGenerator menger;
 	PerlinNoise noise;
-	int loadDistance = 4;
+	int loadDistance = 6;
 	
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
 	mutable std::shared_mutex chunkMapMutex;
@@ -63,14 +68,18 @@ class LogicSystem {
 	std::atomic<bool> running = true;
 
 	// multithreading //
-	std::thread logicThread;
-
-	std::mutex readyQueueMutex;
-	std::queue<std::unique_ptr<ChunkSnapshot>> readyChunks;
-    std::condition_variable readyCv;
-
 	std::queue<std::function<void()>> commandQueue;
 	std::mutex commandMutex;
+	std::thread logicThread;
+	
+	std::queue<std::function<void()>> tasks;
+	std::mutex taskQueueMutex;
+	std::condition_variable taskCv;
+	std::thread workerThread;
+
+	std::mutex readyQueueMutex;
+	std::deque<std::unique_ptr<ChunkSnapshot>> readyChunks;
+    std::condition_variable readyCv;
 
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	void updateChunk(std::shared_ptr<Chunk> chunk);
@@ -80,6 +89,9 @@ class LogicSystem {
 	friend class BlockRenderer;
 	friend class Mesher;
 
+	void pushTask(std::function<void()> task);
+	void workerThreadLoop();
+	
 	void processAllCommands();
 public:
 	void enqueueCommand(std::function<void()> cmd)
@@ -100,10 +112,11 @@ public:
 		                  playerPos.z.load(std::memory_order_relaxed));
 	}
 
-	void generateChunk(int x, int y, int z);
-	void unloadChunk  (ChunkPtr chunk);
+	void generateChunk(int cx, int cy, int cz);
+	void unloadChunk  (int cx, int cy, int cz);
 
 	void destroyBlock (int x, int y, int z);
+	void placeBlock   (int x, int y, int z);
 	
 	//void destroyBlockLocally(int x, int y, int z);
 	//void createBlock(int x, int y, int z);

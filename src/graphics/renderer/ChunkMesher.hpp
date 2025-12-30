@@ -35,6 +35,7 @@ struct VoxelFace {
         float b[4];
         float s[4];
     } light;
+    uint64_t lightKey;
     
     VoxelFace(FaceDirection fd, int block, int x, int y, int z) : 
         faceDirection(fd), 
@@ -53,9 +54,7 @@ struct VoxelFace {
       maxZ(std::max(a.maxZ, b.maxZ)), light(a.light) {}
 
     inline static bool checkCanCombineLight(VoxelFace &faceA, VoxelFace &faceB) {
-        if(glm::epsilonEqual(faceA.light.s[0]+faceA.light.s[1]+faceA.light.s[2]+faceA.light.s[3], faceB.light.s[0]+faceB.light.s[1]+faceB.light.s[2]+faceB.light.s[3], 1e-5f)) return false;
-        
-        return true;
+        return !(faceA.lightKey == faceB.lightKey);
     }
 
     template<FaceDirection FD> static bool canCombineZWise(VoxelFace &faceA, VoxelFace &faceB) {
@@ -86,8 +85,6 @@ struct VoxelFace {
         return false;
     }
 };
-
-
 
 struct BlockModelCube { 
     Mesh* mesh;
@@ -121,6 +118,21 @@ class ChunkMesher {
         face.light.g[Corner] = (chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + chunk->getBoundLight(x1, y1, z1, 1) + chunk->getBoundLight(x2, y2, z2, 1)) / 5.0f / 15.0f;
         face.light.b[Corner] = (chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + chunk->getBoundLight(x1, y1, z1, 2) + chunk->getBoundLight(x2, y2, z2, 2)) / 5.0f / 15.0f;
         face.light.s[Corner] = (chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + chunk->getBoundLight(x1, y1, z1, 3) + chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
+    }
+
+    inline uint64_t packLight(const VoxelFace::Light& l) {
+        auto q = [](float v) -> uint64_t {
+            return glm::clamp(int(v * 15.0f + 0.5f), 0, 15);
+        };
+
+        uint64_t key = 0;
+        for (int i = 0; i < 4; ++i) {
+            key |= q(l.r[i]) << (i * 4 +  0);  // 0..15
+            key |= q(l.g[i]) << (i * 4 + 16);  // 16..31
+            key |= q(l.b[i]) << (i * 4 + 32);  // 32..47
+            key |= q(l.s[i]) << (i * 4 + 48);  // 48..63
+        }
+        return key;
     }
 
     template<FaceDirection FD> inline void addFace(int block, int x, int y, int z) 
@@ -164,6 +176,7 @@ class ChunkMesher {
             mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z-1, x,y+1,z-1, x+1,y,z-1);
             mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z-1, x,y-1,z-1, x+1,y,z-1);
         }
+        curFace.lightKey = packLight(curFace.light);
         
         if constexpr (FD==FaceDirection::NEG_Y || FD==FaceDirection::POS_Y) {
             vector<VoxelFace> &faces = y_faces[static_cast<size_t>(FD)];

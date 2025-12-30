@@ -24,6 +24,14 @@ struct ChunkPos {
     bool operator==(const ChunkPos& o) const noexcept {
         return x==o.x && y==o.y && z==o.z;
     }
+
+	bool operator<(const ChunkPos& o) const noexcept {
+        if (x != o.x) return x < o.x;
+        if (y != o.y) return y < o.y;
+        return z < o.z;
+    }
+
+
 };
 
 struct ChunkPosHash {
