@@ -279,16 +279,73 @@ void BasicLightSolver::calculateLight(Chunk *chunk) {
 		Chunk* neigbour = chunk->getNeigbourByFace(face);
 		if(!neigbour) continue;
 
-		neigbour->decompress();
-
 		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
-		neigbour->dirtyHot();
+		neigbour->dirty();
     }
 
 	solverR->solve();
 	solverG->solve();
 	solverB->solve();
 	solverS->solve();
+}
+
+void BasicLightSolver::calculateLight(ChunkSnapshot *chunk) {
+	std::queue<LightLocal> addqueue;
+	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+				block vox = chunk->getBlock(x, y, z);
+				if (vox.id != 0) {
+					break;
+				}
+				chunk->setLight(x, y, z, 3, 0xF);
+			}
+		}
+	}
+
+	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+				block vox = chunk->getBlock(x, y, z);
+				if (vox.id != 0) {
+					break;
+				}
+				if (
+					chunk->getBoundLight(x-1, y, z, 3) == 0 ||
+					chunk->getBoundLight(x+1, y, z, 3) == 0 ||
+					chunk->getBoundLight(x, y-1, z, 3) == 0 ||
+					chunk->getBoundLight(x, y+1, z, 3) == 0 ||
+					chunk->getBoundLight(x, y, z-1, 3) == 0 ||
+					chunk->getBoundLight(x, y, z+1, 3) == 0
+					) addqueue.push({x, y, z, chunk->getLight(x, y, z, 3), 3});
+			}
+		}
+	}
+
+	while (!addqueue.empty()) {
+		LightLocal entry = addqueue.front(); addqueue.pop();
+		if (entry.light <= 1) continue;
+		for (size_t i = 0; i < 6; i++) {
+			const int x = entry.lx + OFFS[i][0];
+			const int y = entry.ly + OFFS[i][1];
+			const int z = entry.lz + OFFS[i][2];
+			if(!Chunk::inside(x, y, z)) continue;
+
+			bool should_propagate = false;
+			block v = chunk->getBlock(x, y, z);
+			unsigned char curLight = chunk->getLight(x, y, z, entry.channel);
+
+			if (v.id == 0 && static_cast<int>(curLight) + 1 < entry.light) should_propagate = true;
+
+			if(should_propagate) {
+				chunk->setLight(x, y, z, entry.channel, entry.light - 1);
+				uint8_t nl = entry.light-1;
+				LightLocal nentry{x, y, z, nl, entry.channel};
+
+				addqueue.push(nentry);
+			}
+		}
+	}
 }
 
 void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, Chunk *chunk) {

@@ -111,6 +111,11 @@ public:
 	 */
 	void calculateLight(Chunk* chunk);
 
+	/*
+	 * Calculates light for chunks and neighbours around it.
+	 */
+	void calculateLight(ChunkSnapshot* chunk);
+
 	void removeLightLocally(int lx, int ly, int lz, Chunk* chunk);
 	
 	void placeLightLocally(int lx, int ly, int lz, Emission emission, Chunk* chunk);

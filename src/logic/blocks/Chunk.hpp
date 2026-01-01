@@ -137,6 +137,8 @@ public:
 			if(neighbors[i]) neighbors[i]->neighbors[25-i] = nullptr;
 		}
 	}
+
+	
 	
 	/*
 	 * Compresses chunk in RLE data.
@@ -164,6 +166,12 @@ public:
 		gx = x + chunk->x * ChunkInfo::WIDTH;
 		gy = y + chunk->y * ChunkInfo::HEIGHT;
 		gz = z + chunk->z * ChunkInfo::DEPTH;
+	}
+	
+	static inline bool inside(int x, int y, int z) {
+		return (x >= 0 && x < ChunkInfo::WIDTH  &&
+			    y >= 0 && y < ChunkInfo::HEIGHT &&
+			    z >= 0 && z < ChunkInfo::DEPTH);
 	}
 
 	inline Chunk* getNeigbour(int ind) {
@@ -229,7 +237,7 @@ public:
 	}
 
    	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
-	inline void  setBlock(int32_t lx, int32_t ly, int32_t lz, uint8_t id) const {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
+	inline void  setBlock(int32_t lx, int32_t ly, int32_t lz, uint8_t id) {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
 
 	uint8_t getBoundLight(int lx, int ly, int lz, int channel);
 	uint8_t getLight(int32_t lx, int32_t, int32_t lz, int32_t channel) const;
@@ -241,29 +249,31 @@ public:
  * 
  */
 class ChunkSnapshot { 
-	block blocks[ChunkInfo::VOLUME];
+	
+
+	std::unique_ptr<block[]> blocks;
 
     block border_z[2][ChunkInfo::HEIGHT * ChunkInfo::WIDTH]; // 0 = -Z, 1 = +Z
     block border_x[2][ChunkInfo::HEIGHT * ChunkInfo::DEPTH]; // 0 = -X, 1 = +X
 
-    uint16_t light[ChunkInfo::VOLUME] {0};
+    std::unique_ptr<Lightmap> lightmap;
 
     uint16_t light_border_z[2][ChunkInfo::HEIGHT * ChunkInfo::WIDTH] {0};
     uint16_t light_border_x[2][ChunkInfo::HEIGHT * ChunkInfo::DEPTH] {0};
 
     uint16_t light_border_diag[4][ChunkInfo::HEIGHT] {0};
 public:
+	int x, y, z;
 	std::shared_ptr<Chunk> source;
 
-    ChunkSnapshot(std::shared_ptr<Chunk> src) : source(src) {
+    ChunkSnapshot(std::shared_ptr<Chunk> src) : source(src), blocks(new block[ChunkInfo::VOLUME]), lightmap(new Lightmap), x(src->x), y(src->y), z(src->z) {
 		constexpr int W = ChunkInfo::WIDTH; constexpr int H = ChunkInfo::HEIGHT; constexpr int D = ChunkInfo::DEPTH;
 
-		std::copy_n(src->blocks.get(), ChunkInfo::VOLUME, blocks);
-		std::copy_n(src->lightmap->map, ChunkInfo::VOLUME, light);
+		std::copy_n(src->blocks.get(), ChunkInfo::VOLUME, blocks.get());
+		std::copy_n(src->lightmap->map, ChunkInfo::VOLUME, lightmap->map);
 
 		Chunk* nXpos = src->getNeighbourByFace<FaceDirection::POS_X>();
 		Chunk* nXneg = src->getNeighbourByFace<FaceDirection::NEG_X>();
-		
 		Chunk* nZpos = src->getNeighbourByFace<FaceDirection::POS_Z>();
 		Chunk* nZneg = src->getNeighbourByFace<FaceDirection::NEG_Z>();
 
@@ -325,7 +335,19 @@ public:
 		}
 	}
 
+	void commit() {
+		if(source) {
+			std::copy_n(blocks.get(), ChunkInfo::VOLUME, source->blocks.get());
+			std::copy_n(lightmap->map, ChunkInfo::VOLUME, source->lightmap->map);
+
+		}
+	}
+
 	inline block getBlock(int32_t lx, int32_t ly, int32_t lz) const {return blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx];}
+	inline void  setBlock(int32_t lx, int32_t ly, int32_t lz, int id)       {blocks[(ly * ChunkInfo::DEPTH + lz) * ChunkInfo::WIDTH + lx].id = id;}
+
+	inline uint8_t getLight(int32_t lx, int32_t ly, int32_t lz, int channel) const {return lightmap->get(lx, ly, lz, channel);}
+	inline void  setLight(int32_t lx, int32_t ly, int32_t lz, int channel, int emission) {lightmap->set(lx, ly, lz, channel, emission);}
 
 	inline block getBoundBlock(int32_t lx, int32_t ly, int32_t lz) const {
 		constexpr int W = ChunkInfo::WIDTH;
@@ -360,7 +382,7 @@ public:
 			ly >= 0 && ly < H &&
 			lz >= 0 && lz < D)
 		{
-			return (light[(ly * D + lz) * W + lx] >> (channel * 4)) & 0xF;
+			return lightmap->get(lx, ly, lz, channel);
 		}
 		if (lx < 0 && lz >= 0 && lz < D) {
 			return (light_border_x[0][ly * D + lz] >> (channel * 4)) & 0xF;

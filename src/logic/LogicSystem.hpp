@@ -62,20 +62,26 @@ class LogicSystem {
 	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
 	mutable std::shared_mutex chunkMapMutex;
 
+ 	std::queue<std::shared_ptr<ChunkSnapshot>> toCommit;
+	mutable std::shared_mutex commitMutex;
+
 	PlayerPos playerPos;
 	glm::ivec3 lastPlayerChunk;
 
 	std::atomic<bool> running = true;
 
 	// multithreading //
+	std::thread logicThread;
+	std::thread workerThread;
+
 	std::queue<std::function<void()>> commandQueue;
 	std::mutex commandMutex;
-	std::thread logicThread;
+	
 	
 	std::queue<std::function<void()>> tasks;
 	std::mutex taskQueueMutex;
 	std::condition_variable taskCv;
-	std::thread workerThread;
+	
 
 	std::mutex readyQueueMutex;
 	std::deque<std::unique_ptr<ChunkSnapshot>> readyChunks;
@@ -84,7 +90,9 @@ class LogicSystem {
 	void loadNeighbours(std::shared_ptr<Chunk> chunk);
 	void updateChunk(std::shared_ptr<Chunk> chunk);
 	void updateLight(std::shared_ptr<Chunk> chunk);
+
 	void generate(std::shared_ptr<Chunk> chunk);
+	void generate(ChunkSnapshot *chunk);
 
 	friend class BlockRenderer;
 	friend class Mesher;

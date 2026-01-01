@@ -3,6 +3,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <shared_mutex>
 
 using namespace glm;
 
@@ -68,19 +69,41 @@ void LogicSystem::generate(ChunkPtr chunk)
         if(n>0.3f) id = 1;
         if(id) chunk->setBlock(x, y, z, id);
     }
-            
-        
-    
 }
 
-void LogicSystem::updateChunk(ChunkPtr chunk) {
-    chunk->setState(ChunkState::Finished);
+void LogicSystem::generate(ChunkSnapshot *chunk)
+{
+    const float scale  = 0.019873f;
+    const float scale2 = 0.04f;
+    const int   height = 40;
+
+    for (int z = 0; z < ChunkInfo::DEPTH;  z++) 
+    for (int x = 0; x < ChunkInfo::WIDTH;  x++) 
+    for (int y = 0; y < ChunkInfo::HEIGHT; y++) 
+    {
+        int gx = x + chunk->x * (int)ChunkInfo::WIDTH;
+        int gz = z + chunk->z * (int)ChunkInfo::DEPTH;
+        int gy = y + chunk->y * (int)ChunkInfo::HEIGHT;
+
+        float n = noise.noise(
+            gx * scale2,
+            gy * scale2,
+            gz * scale2
+        );
+        int id = 0;
+        if(n>0.3f) id = 1;
+        if(id) chunk->setBlock(x, y, z, id);
+    }
+}
+
+void LogicSystem::updateChunk(ChunkPtr chunk) { chunk->setState(ChunkState::Finished);
     auto snapshot = std::make_unique<ChunkSnapshot>(chunk);
     {
         std::lock_guard lk(readyQueueMutex);
         readyChunks.push_front(std::move(snapshot));
         readyCv.notify_one();
     }
+   
 }
 
 void LogicSystem::updateLight(ChunkPtr chunk) {
@@ -89,23 +112,7 @@ void LogicSystem::updateLight(ChunkPtr chunk) {
     updateChunk(chunk);
 }
 
-void LogicSystem::generateChunk(int x, int y, int z) {
-        {
-            std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
-            auto it = chunkMap.find({x, y, z});
-            if (it != chunkMap.end()) return;
-        }
-        ChunkPtr chunk = std::make_shared<Chunk>(x, y, z);
-        generate(chunk);
-        loadNeighbours(chunk);
-    
-        lightSolver.propagateSunLight(chunk.get());
-        lightSolver.calculateLight(chunk.get());
-        
-        chunkMap.emplace(chunk->position(), chunk);
-        
-        updateChunk(chunk);
-}
+
 
 void LogicSystem::unloadChunk(int cx, int cy, int cz) {
     {
@@ -250,8 +257,41 @@ void LogicSystem::pushTask(std::function<void()> task) {
     taskCv.notify_one();
 }
 
+void LogicSystem::generateChunk(int x, int y, int z) {
+        {
+            std::shared_lock<std::shared_mutex> mapLock(chunkMapMutex);
+            auto it = chunkMap.find({x, y, z});
+            if (it != chunkMap.end()) return;
+        }
+        ChunkPtr chunk = std::make_shared<Chunk>(x, y, z);
+        loadNeighbours(chunk);
+        
+
+        auto snapshot = std::make_shared<ChunkSnapshot>(chunk);
+        pushTask([this, snapshot] {
+            generate(snapshot.get());
+            lightSolver.calculateLight(snapshot.get());
+            
+            {
+                std::unique_lock<std::shared_mutex> l(commitMutex);
+                toCommit.push(snapshot);
+            }
+        });
+        
+        chunkMap.emplace(chunk->hash_pos, chunk);
+}
+
 void LogicSystem::logicUpdate(double dt) {
     processAllCommands();
+    {
+        std::unique_lock<std::shared_mutex> l(commitMutex);
+        while(!toCommit.empty()) {
+            auto snapshot = toCommit.front(); toCommit.pop();
+            snapshot->commit();
+            
+            lightSolver.calculateLight(snapshot->source.get());
+        }
+    }
 
     ivec3 playerChunk = worldToChunk3(loadPlayerPos());
     std::vector<ChunkPtr> toUnload;
@@ -262,10 +302,6 @@ void LogicSystem::logicUpdate(double dt) {
             {
                 toUnload.push_back(chunk);
             } 
-
-            //if (chunk->checkState(ChunkState::Finished) && !insideRadius(playerChunk, pos, 1)) chunk->compress();
-            ////else chunk->decompress();
-            
             if(chunk->checkState(ChunkState::NeedsUpdate)) 
             {
                 updateChunk(chunk);
@@ -278,9 +314,7 @@ void LogicSystem::logicUpdate(double dt) {
 	if (playerChunk != lastPlayerChunk) {
 		for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
             for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
-                //for (int y = playerChunk.y - loadDistance; y <= playerChunk.y + loadDistance; y++) {
-                    if(commandQueue.empty()) generateChunk(x, 0, z); 
-                //}
+                if(commandQueue.empty()) generateChunk(x, 0, z); 
             }
         }
 
