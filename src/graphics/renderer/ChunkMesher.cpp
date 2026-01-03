@@ -1,10 +1,11 @@
 
 #include "ChunkMesher.hpp"
+
 #include <memory>
 #include <mutex>
 
 // BLOCK MESHER
-void BlockModelCube::addFaceXPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceXPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                    float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -23,7 +24,7 @@ void BlockModelCube::addFaceXPlane(float x1, float y1, float z1, float x2, float
     mesh->indices.push_back(startIndex + 3);
 }
 
-void BlockModelCube::addFaceNXPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceNXPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                     float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -42,7 +43,7 @@ void BlockModelCube::addFaceNXPlane(float x1, float y1, float z1, float x2, floa
     mesh->indices.push_back(startIndex + 2);
 }
 
-void BlockModelCube::addFaceYPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceYPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                    float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -61,7 +62,7 @@ void BlockModelCube::addFaceYPlane(float x1, float y1, float z1, float x2, float
     mesh->indices.push_back(startIndex + 3);
 }
 
-void BlockModelCube::addFaceNYPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceNYPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                     float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -80,7 +81,7 @@ void BlockModelCube::addFaceNYPlane(float x1, float y1, float z1, float x2, floa
     mesh->indices.push_back(startIndex + 3);
 }
 
-void BlockModelCube::addFaceZPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceZPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                    float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -99,7 +100,7 @@ void BlockModelCube::addFaceZPlane(float x1, float y1, float z1, float x2, float
     mesh->indices.push_back(startIndex + 3);
 }
 
-void BlockModelCube::addFaceNZPlane(float x1, float y1, float z1, float x2, float y2, float z2,
+void BlockModelCubeMaker::addFaceNZPlane(float x1, float y1, float z1, float x2, float y2, float z2,
                                     float u1, float v1, float u2, float v2, const VoxelFace::Light &l)
 {
     unsigned int startIndex = mesh->buffer.size();
@@ -120,12 +121,14 @@ void BlockModelCube::addFaceNZPlane(float x1, float y1, float z1, float x2, floa
 
 // CHUNK MESHER
 void ChunkMesher::addCube(int block, int lx, int ly, int lz) {
-    if (!chunk->getBoundBlock(lx, ly+1, lz).isOpaque()) addFace<FaceDirection::POS_Y>(block, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly-1, lz).isOpaque()) addFace<FaceDirection::NEG_Y>(block, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx+1, ly, lz).isOpaque()) addFace<FaceDirection::POS_X>(block, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx-1, ly, lz).isOpaque()) addFace<FaceDirection::NEG_X>(block, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly, lz+1).isOpaque()) addFace<FaceDirection::POS_Z>(block, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly, lz-1).isOpaque()) addFace<FaceDirection::NEG_Z>(block, lx, ly, lz);
+    const BlockModel& model = BlockModelRegistry::get(block);
+
+    if (!chunk->getBoundBlock(lx, ly+1, lz).isOpaque()) addFace<FaceDirection::POS_Y>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly-1, lz).isOpaque()) addFace<FaceDirection::NEG_Y>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx+1, ly, lz).isOpaque()) addFace<FaceDirection::POS_X>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx-1, ly, lz).isOpaque()) addFace<FaceDirection::NEG_X>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly, lz+1).isOpaque()) addFace<FaceDirection::POS_Z>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly, lz-1).isOpaque()) addFace<FaceDirection::NEG_Z>(model, lx, ly, lz);
 }
 
 void ChunkMesher::make() {
@@ -145,11 +148,7 @@ void ChunkMesher::make() {
     const unordered_map<size_t, vector<VoxelFace>>& posz_map = zx_faces[static_cast<size_t>(FaceDirection::POS_Z)];
     const unordered_map<size_t, vector<VoxelFace>>& negz_map = zx_faces[static_cast<size_t>(FaceDirection::NEG_Z)];
 
-    
-
-    constexpr float uvsize = 32.0f / 512.0f;
-    float u = 0.0625f;
-    float v = 0.9375f - uvsize;
+    constexpr float uvsize = 16.0f / 512.0f;
     for(const auto& p : posx_map) 
     for(const auto& f : p.second) 
     {
@@ -159,8 +158,8 @@ void ChunkMesher::make() {
         float y2 = f.maxY+1;
         float z2 = f.maxZ+1;
 
-        float u1 = u + (f.maxZ - f.minZ);
-        float v1 = v + (f.maxY - f.minY);
+        float u1 = ((f.texture % 32) * uvsize)  + (f.maxZ - f.minZ);
+        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceXPlane(x2, y1, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -174,8 +173,8 @@ void ChunkMesher::make() {
         float y2 = f.maxY+1;
         float z2 = f.maxZ+1;
 
-        float u1 = u + (f.maxZ - f.minZ);
-        float v1 = v + (f.maxY - f.minY);
+        float u1 = ((f.texture % 32) * uvsize)    + (f.maxZ - f.minZ);
+        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNXPlane(x1, y1, z1, x1, y2, z2, u1, v1, u2, v2, f.light);
@@ -187,8 +186,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ+1;
         float x2 = f.maxX+1;
 
-        float u1 = u + (f.maxX - f.minX);
-        float v1 = v + (f.maxZ - f.minZ);
+        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
+        float v1 = (1 - f.texture / 32.0) + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceYPlane(x1, y2, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -200,8 +199,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ+1;
         float x2 = f.maxX+1;
 
-        float u1 = u + (f.maxX - f.minX);
-        float v1 = v + (f.maxZ - f.minZ);
+        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
+        float v1 = (1 - f.texture / 32.0) + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNYPlane(x1, y1, z1, x2, y1, z2, u1, v1, u2, v2, f.light);
@@ -214,8 +213,8 @@ void ChunkMesher::make() {
         float x2 = f.maxX+1;
         float y2 = f.maxY+1;
 
-        float u1 = u + (f.maxX - f.minX);
-        float v1 = v + (f.maxY - f.minY);
+        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
+        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceZPlane(x1, y1, z2, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -228,8 +227,8 @@ void ChunkMesher::make() {
         float x2 = f.maxX+1;
         float y2 = f.maxY+1;
 
-        float u1 = u + (f.maxX - f.minX);
-        float v1 = v + (f.maxY - f.minY);
+        float u1 = ((f.texture % 32) * uvsize)  + (f.maxX - f.minX);
+        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNZPlane(x1, y1, z1, x2, y2, z1, u1, v1, u2, v2, f.light);

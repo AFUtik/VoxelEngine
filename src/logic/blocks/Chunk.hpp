@@ -78,7 +78,7 @@ const int FACES_ARRAY[] = {
 class Chunk {
 	Chunk* neighbors[26] {nullptr};
 
-	friend class LogicSystem;
+	friend class World;
 	friend class ChunkCompressor;
 	friend class ChunkMesher;
 	friend class LightSolver;

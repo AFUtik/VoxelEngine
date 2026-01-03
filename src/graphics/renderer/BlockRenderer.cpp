@@ -3,7 +3,7 @@
 #include "../Frustum.hpp"
 #include "../../logic/blocks/Chunk.hpp"
 #include "../../logic/blocks/ChunkInfo.hpp"
-#include "../../logic/LogicSystem.hpp"
+#include "../../logic/World.hpp"
 
 #include "../../graphics/Transform.hpp"
 

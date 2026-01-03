@@ -1,111 +1,49 @@
 #ifndef BLOCKREGISTER_HPP
 #define BLOCKREGISTER_HPP
 
-#include <optional>
+#include "AbstractBlock.hpp"
 #include <cstdint>
-#include <string>
-#include <vector>
-#include <array>
 #include <unordered_map>
 
-#include "../graphics/texture/TextureRegion.hpp"
+constexpr int MAX_BLOCKS = 4096;
 
-using BlockTextureSet = std::array<uint32_t, 6>;
-using BlockID = uint16_t;
-using StateIndex = uint32_t;
-
-struct Identifier {
-    BlockID id = 0;
-    std::string name;
-
-    Identifier() = default;
-    Identifier(BlockID id_, std::string name_) : id(id_), name(std::move(name_)) {}
+struct FaceInfo {
+    uint16_t texture;
 };
 
-struct BlockState {
-    BlockID id = 0;
-    std::string name;
-
-    uint32_t model_id;
-    BlockTextureSet textures{};
-
-    BlockState() = default;
-    BlockState(BlockID id_, std::string name_, const BlockTextureSet& tex)
-        : id(id_), name(std::move(name_)), textures(tex) {}
+struct BlockModel {
+    uint16_t id;
+    bool opaque;
+    bool fullCube;
+    FaceInfo faces[6];
 };
 
-struct BlockPrototype {
-    BlockID id = 0;
-    std::string name;
-
-    std::vector<BlockState> states;
-    std::unordered_map<std::string, StateIndex> stateMap;
-
-    BlockPrototype() = default;
-    BlockPrototype(BlockID id_, std::string name_) : id(id_), name(std::move(name_)) {}
-
-    StateIndex addState(BlockState state) {
-        StateIndex idx = static_cast<StateIndex>(states.size());
-        stateMap.emplace(state.name, idx);
-        states.emplace_back(std::move(state));
-        return idx;
+class BlockModelRegistry {
+    static inline BlockModel models[MAX_BLOCKS];
+public:
+    static inline const BlockModel& get(uint16_t id) {
+        return models[id];
     }
 
-    std::optional<StateIndex> findStateIndex(std::string_view s) const {
-        auto it = stateMap.find(std::string(s));
-        if (it == stateMap.end()) return std::nullopt;
-        return it->second;
+    static inline void registerBlockModel(BlockModel& model) {
+        models[model.id] = model;
     }
 };
 
 class BlockRegistry {
-    static inline std::vector<BlockPrototype> registry;
-    static inline std::unordered_map<std::string, uint32_t> registryMap;
-
-    static inline BlockID nextBlockID = 1;
-    static inline BlockID nextStateID = 1;
+    static inline AbstractBlock blocks[MAX_BLOCKS];
+    static inline std::unordered_map<std::string, uint16_t> blockMap;
 public:
-    static uint32_t registerBlock(std::string name, BlockPrototype proto) {
-        //std::lock_guard<std::mutex> lk(registryMutex);
-
-        if (registryMap.find(name) != registryMap.end())
-            return registryMap[name];
-
-        proto.id = nextBlockID++;
-        proto.name = std::move(name);
-
-        uint32_t idx = static_cast<uint32_t>(registry.size());
-        registryMap.emplace(proto.name, idx);
-        registry.emplace_back(std::move(proto));
-        return idx;
+    static inline const AbstractBlock& get(uint16_t id) {
+        return blocks[id];
     }
 
-    static std::optional<StateIndex> registerState(std::string_view block_name, BlockState state) {
-        //std::lock_guard<std::mutex> lk(registryMutex);
-
-        auto it = registryMap.find(std::string(block_name));
-        if (it == registryMap.end()) return std::nullopt;
-
-        // присвоим уникальный id состоянию (если нужно)
-        state.id = nextStateID++;
-        BlockPrototype &proto = registry[it->second];
-        StateIndex idx = proto.addState(std::move(state));
-        return idx;
-    }
-
-    static const BlockPrototype* getBlockByName(std::string_view name) {
-        //std::lock_guard<std::mutex> lk(registryMutex);
-
-        auto it = registryMap.find(std::string(name));
-        if (it == registryMap.end()) return nullptr;
-        return &registry[it->second];
-    }
-
-    static const BlockPrototype* getBlockByIndex(uint32_t index) {
-        //std::lock_guard<std::mutex> lk(registryMutex);
-
-        if (index >= registry.size()) return nullptr;
-        return &registry[index];
+    static inline void registerBlock(AbstractBlock& block) {
+        std::string literal = block.getLiteralId();
+        if(!literal.empty()) {
+            blockMap[literal] = block.getId();
+        }
+        blocks[block.getId()] = block;
     }
 };
 

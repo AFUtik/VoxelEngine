@@ -8,8 +8,8 @@ Camera::Camera(dvec3 position, float fov) : originPosition(position), fov(fov), 
 	updateVectors();
 }
 
-void Camera::set(double x, double y, double z) {
-	originPosition = glm::vec3(x, y, z);
+void Camera::set(const glm::dvec3 &p) {
+	originPosition = p;
 }
 
 void Camera::updateVectors() {

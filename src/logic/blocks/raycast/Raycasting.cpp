@@ -1,10 +1,10 @@
 #include "Raycasting.hpp"
-#include "../../LogicSystem.hpp"
+#include "../../World.hpp"
 
 BlockHit raycastBlock(const glm::dvec3& origin,
                       const glm::vec3& dir,
                       float maxDistance,
-                      LogicSystem* world)
+                      World* world)
 {
     glm::dvec3 pos = glm::floor(origin);
     glm::ivec3 blockPos = glm::ivec3(pos);

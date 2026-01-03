@@ -29,17 +29,17 @@ public:
     }
 };
 
-class LogicSystem;
+class World;
 
 class LightSolver {
 	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> addqueue;
 	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> remqueue;
-	LogicSystem* chunks;
+	World* chunks;
 	int channel;
 
 	friend class BasicLightSolver;
 public:
-	LightSolver(LogicSystem* chunks, int channel);
+	LightSolver(World* chunks, int channel);
 
 	/*
 	 * Adds light right in chunk without chunk finding.
@@ -92,7 +92,7 @@ class BasicLightSolver {
 	}
 public:
 	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
-	BasicLightSolver(LogicSystem* chunks);
+	BasicLightSolver(World* chunks);
 
 	/*
 	 * Propagates light sun top to bottom.

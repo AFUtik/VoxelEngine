@@ -4,7 +4,7 @@
 class Camera;
 class Mesh;
 class Chunk;
-class LogicSystem;
+class World;
 class Shader;
 class Frustum;
 
@@ -13,10 +13,10 @@ class Frustum;
 #include "GlController.hpp"
 
 class BlockRenderer : public Renderer {
-	LogicSystem* world;
+	World* world;
 	Mesher mesher;
 public:
-	BlockRenderer(LogicSystem* chunks) : world(chunks), mesher(chunks) {}
+	BlockRenderer(World* chunks) : world(chunks), mesher(chunks) {}
 
 	void render() override;
 };

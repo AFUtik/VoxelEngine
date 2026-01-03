@@ -42,7 +42,7 @@ public:
 	inline dvec3& getPosition() {return originPosition;}
 
 	void translate(const glm::dvec3 &dp);
-	void set(double x, double y, double z);
+	void set(const glm::dvec3 &p);
 	void rotate(float x, float y, float z);
 
 	mat4 getProjection();

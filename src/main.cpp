@@ -10,10 +10,12 @@
 #include "graphics/renderer/BlockRenderer.hpp"
 #include "graphics/renderer/DrawContext.hpp"
 
+#include "logic/blocks/AbstractBlock.hpp"
+#include "logic/blocks/BlockRegistry.hpp"
 #include "logic/blocks/chunk_utils.hpp"
 #include "logic/lighting/LightSolver.hpp"
 #include "logic/blocks/raycast/Raycasting.hpp"
-#include "logic/LogicSystem.hpp"
+#include "logic/World.hpp"
 
 #include "graphics/renderer/DrawContext.hpp"
 #include "graphics/renderer/Renderer.hpp"
@@ -43,6 +45,12 @@ int main(int argc, char* argv[])
 	std::cout << "+z" << " " << neighbourIndexFromDelta(0, 0, 1) << std::endl;
 	std::cout << "-z" << " " << neighbourIndexFromDelta(0, 0, -1) << std::endl;
 
+	BlockModel model;
+	model.id = 1;
+	model.fullCube = true;
+	for(int i = 0; i < 6; i++) model.faces[i].texture = 1;
+	BlockModelRegistry::registerBlockModel(model);
+
 	std::string absolute_path = std::filesystem::absolute(argv[0]).parent_path().string();
 
 	std::ios::sync_with_stdio(false);
@@ -57,7 +65,7 @@ int main(int argc, char* argv[])
 		Window::terminate();
 		return 1;
 	}
-	uptr<Texture> texture = uptr<Texture>(load_texture(absolute_path + "\\res\\images\\block.png"));
+	uptr<Texture> texture = uptr<Texture>(load_texture(absolute_path + "\\res\\images\\atlas.png"));
 	if (texture == nullptr) {
 		std::cerr << "failed to load texture" << std::endl;
 		Window::terminate();
@@ -70,9 +78,9 @@ int main(int argc, char* argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	LogicSystem* logic = new LogicSystem();
+	World* logic = new World();
 
-	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(1, 0, 0), glm::radians(90.0f));
+	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(0, 0, 0), glm::radians(90.0f));
 	uptr<Frustum> frustum = std::make_unique<Frustum>(camera.get());
 
 	DrawContext drawContext(new Renderer(camera.get(), shader.get(), frustum.get()));
@@ -105,16 +113,16 @@ int main(int argc, char* argv[])
 			}
 
 			if (Events::pressed(GLFW_KEY_W)) {
-				camera->translate(camera->zdir() * H * speed);
+				logic->enqueuePlayerMove(PlayerMoveInput{camera->zdir()});
 			}
 			if (Events::pressed(GLFW_KEY_S)) {
-				camera->translate(-camera->zdir() * H * speed);
+				logic->enqueuePlayerMove(PlayerMoveInput{-camera->zdir()});
 			}
 			if (Events::pressed(GLFW_KEY_D)) {
-				camera->translate(camera->xdir() * H * speed);
+				logic->enqueuePlayerMove(PlayerMoveInput{camera->xdir()});
 			}
 			if (Events::pressed(GLFW_KEY_A)) {
-				camera->translate(-camera->xdir() * H * speed);
+				logic->enqueuePlayerMove(PlayerMoveInput{-camera->xdir()});
 			}
 			if (Events::jpressed(GLFW_KEY_H)) {
 				glm::ivec3 pos = worldToChunk3(camera->getPosition());
@@ -123,21 +131,22 @@ int main(int argc, char* argv[])
 			if (Events::jpressed(GLFW_KEY_J)) {
 				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, logic);
 				if(hit.hit) logic->enqueueCommand([logic=logic, hit] {
-					logic->placeBlock(hit.x, hit.y + 1, hit.z);
+					AbstractBlock block;
+					block.id = 0;
+					block.emission = {0, 0, 15, 15};
+
+					logic->placeBlock(hit.x, hit.y + 1, hit.z, block);
 				});
 			}
 			if (Events::pressed(GLFW_KEY_SPACE)) {
 				camera->setydir(glm::dvec3(0, 1, 0));
 
-				camera->translate(camera->ydir() * H * speed);
+				logic->enqueuePlayerMove(PlayerMoveInput{camera->ydir()});
 			}
 			if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
 				camera->setydir(glm::dvec3(0, 1, 0));
 
-				camera->translate(-camera->ydir() * H * speed);
-			}
-			if (Events::pressed(GLFW_KEY_0)) {
-				camera->set(0, 0, 0);
+				logic->enqueuePlayerMove(PlayerMoveInput{-camera->ydir()});
 			}
 
 			if (Events::_cursor_locked) {
@@ -154,6 +163,7 @@ int main(int argc, char* argv[])
 				camera->setRotation(glm::mat4(1.0f));
 				camera->rotate(camY, camX, 0);
 			}
+			camera->set(logic->getPlayerPos());
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -164,8 +174,6 @@ int main(int argc, char* argv[])
 			
 			shader->uniformMatrix("projview", projview);
 			texture->bind();
-			
-			logic->setPlayerPos(camera->getPosition());
 
 			frustum->update(projview);
 			drawContext.render();
