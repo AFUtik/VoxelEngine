@@ -4,9 +4,13 @@
 #include "glm/ext/vector_double3.hpp"
 #include <glm/glm.hpp>
 
+#include "Frustum.hpp"
+
 using namespace glm;
 
 class Camera {
+	Frustum frustum;
+
 	const double REBASE_GRANULARITY = 1000.0;
 
 	void updateVectors();
@@ -24,10 +28,14 @@ class Camera {
 	float fov;
 	mat4 rotation;
 	mat4 view;
+	mat4 proj;
+	mat4 projview;
 	
 	dvec3 getRebaseShift();
 public:
 	Camera(dvec3 position, float fov);
+
+	inline Frustum& getFrustum() { return frustum; }
 
 	inline void setxdir(const glm::dvec3 &dir) {x_dir = dir;}
 	inline void setydir(const glm::dvec3 &dir) {y_dir = dir;}
@@ -45,8 +53,11 @@ public:
 	void set(const glm::dvec3 &p);
 	void rotate(float x, float y, float z);
 
+	void update();
+
+	const mat4& getProjview();
 	mat4 getProjection();
-	const mat4& updateView();
+	const mat4& getView();
 
 	vec3 getViewDir();
 	

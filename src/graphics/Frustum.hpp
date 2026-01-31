@@ -2,7 +2,7 @@
 #define FRUSTUM_HPP
 
 #include "Camera.hpp"
-#include <glm/glm.hpp>
+#include <physics.hpp>
 
 struct Plane {
     glm::vec3 normal;
@@ -14,10 +14,7 @@ struct Plane {
 };
 
 class Frustum {
-    Camera* camera;
 public:
-    Frustum(Camera* camera) : camera(camera) {};
-
     Plane planes[6];
     
     void update(const glm::mat4& m) {
@@ -56,15 +53,12 @@ public:
         return true;
     }
 
-    bool boxInFrustum(glm::vec3 min, glm::vec3 max) const {
-        min -= vec3(camera->getWorldShift());
-        max -= vec3(camera->getWorldShift());
-
+    bool boxInFrustum(const AABB &aabb) const {
         for (int i = 0; i < 6; i++) {
-            glm::vec3 p = min;
-            if (planes[i].normal.x >= 0) p.x = max.x;
-            if (planes[i].normal.y >= 0) p.y = max.y;
-            if (planes[i].normal.z >= 0) p.z = max.z;
+            glm::vec3 p = aabb.min;
+            if (planes[i].normal.x >= 0) p.x = aabb.max.x;
+            if (planes[i].normal.y >= 0) p.y = aabb.max.y;
+            if (planes[i].normal.z >= 0) p.z = aabb.max.z;
             if (planes[i].distance(p) < -1e-4f) return false;
         }
         return true;

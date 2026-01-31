@@ -3,22 +3,13 @@
 
 #include <glm/glm.hpp>
 
-#include "Drawable.hpp"
-#include "../../logic/blocks/Block.hpp"
-#include "../../logic/blocks/ChunkInfo.hpp"
-#include "../../logic/blocks/Chunk.hpp"
-#include "../../logic/World.hpp"
 #include "../model/Mesh.hpp"
-
 #include "GLController.hpp"
 
-#include <memory>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
+#include "../../logic/server/blocks/BlockRegistry.hpp"
+#include "../../logic/client/blocks/ChunkClient.hpp"
 
-#include "../../logic/blocks/BlockRegistry.hpp"
-
+class Shader;
 class Mesher;
 
 using namespace glm;
@@ -107,7 +98,7 @@ class ChunkMesher {
     unordered_map<size_t, vector<VoxelFace>> zx_faces[6];
 
     BlockModelCubeMaker cubeModel;
-    ChunkSnapshot* chunk;
+    Chunk* chunk;
 
     template<size_t Corner>
     inline void mix4_light(
@@ -117,10 +108,10 @@ class ChunkMesher {
         int x1, int y1, int z1,
         int x2, int y2, int z2
         ) {
-        face.light.r[Corner] = (chunk->getBoundLight(x0, y0, z0, 0) + cr * 30 + chunk->getBoundLight(x1, y1, z1, 0) + chunk->getBoundLight(x2, y2, z2, 0)) / 5.0f / 15.0f;
-        face.light.g[Corner] = (chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + chunk->getBoundLight(x1, y1, z1, 1) + chunk->getBoundLight(x2, y2, z2, 1)) / 5.0f / 15.0f;
-        face.light.b[Corner] = (chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + chunk->getBoundLight(x1, y1, z1, 2) + chunk->getBoundLight(x2, y2, z2, 2)) / 5.0f / 15.0f;
-        face.light.s[Corner] = (chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + chunk->getBoundLight(x1, y1, z1, 3) + chunk->getBoundLight(x2, y2, z2, 3)) / 5.0f / 15.0f;
+        face.light.r[Corner] = (chunk->getBoundLight(x0, y0, z0, 0) + cr * 30 + chunk->getBoundLight(x1, y1, z1, 0) + chunk->getBoundLight(x2, y2, z2, 0)) / 75.0f;
+        face.light.g[Corner] = (chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + chunk->getBoundLight(x1, y1, z1, 1) + chunk->getBoundLight(x2, y2, z2, 1)) / 75.0f;
+        face.light.b[Corner] = (chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + chunk->getBoundLight(x1, y1, z1, 2) + chunk->getBoundLight(x2, y2, z2, 2)) / 75.0f;
+        face.light.s[Corner] = (chunk->getBoundLight(x0, y0, z0, 3) + cs * 30 + chunk->getBoundLight(x1, y1, z1, 3) + chunk->getBoundLight(x2, y2, z2, 3)) / 75.0f;
     }
 
     inline uint64_t packLight(const VoxelFace::Light& l) {
@@ -213,37 +204,36 @@ class ChunkMesher {
 public:
     void make();
 
-    ChunkMesher(ChunkSnapshot* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
+    ChunkMesher(Chunk* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
         for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
     }
 };
 
 class Mesher {
-    std::unique_ptr<GlController> glController;
-    World* world;
+    GlController* glController;
+    Shader* shader;
 
-    std::mutex meshUploadMutex;
-    std::queue<std::pair<ChunkPtr, std::shared_ptr<Mesh>>> meshUploadQueue;
     std::thread worker;
     bool stop = false;
 
+    std::deque<std::shared_ptr<ChunkClient>> buildMeshDeq;
+    std::mutex buildMeshMutex;
+    std::condition_variable buildMeshCVar;
+
     friend class BlockRenderer; 
 public:
-    Mesher(World* world) : glController(new GlController), world(world) {
-        worker = std::thread([this, world] { meshWorkerThread(); });
+    Mesher(GlController* glController, Shader* shader) : glController(glController), shader(shader) {
+        worker = std::thread([this] { meshWorkerThread(); });
     }
 
     ~Mesher() {
-        {
-            std::lock_guard<std::mutex> lk(world->readyQueueMutex);
-            stop = true;
-        }
-        world->readyCv.notify_all();
         if (worker.joinable())
             worker.join();
     }
 
     void meshWorkerThread();
+
+    void queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient);
 };
 
 #endif //CUBEMESHER_HPP

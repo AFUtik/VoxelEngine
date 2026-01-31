@@ -7,14 +7,28 @@
 
 #include <iostream>
 
+std::shared_ptr<Mesh> GlController::createMesh() {
+    return std::make_shared<Mesh>(this);
+}
+
+void GlController::queueUpload(std::shared_ptr<Mesh> mesh) {
+    std::lock_guard<std::mutex> lock(this->meshUploadMutex);
+    glUpload.push_front(mesh);
+}
+
+void GlController::queueFree(std::shared_ptr<Mesh> mesh) {
+    std::lock_guard<std::mutex> lock(this->meshDeleteMutex);
+    glDelete.push_front({ mesh->VBO, mesh->VAO, mesh->EBO });
+}
+
 void GlController::processAll() {
     {
         std::lock_guard<std::mutex> lk(meshUploadMutex);
         while (!glUpload.empty()) {
             auto mesh = glUpload.front();
-            glUpload.pop();
+            glUpload.pop_front();
             
-            if(!mesh || mesh->uploaded) continue;
+            if(!mesh || mesh->isUploaded()) continue;
 
             glGenVertexArrays(1, &mesh->VAO);
             glGenBuffers(1, &mesh->VBO);
@@ -41,7 +55,7 @@ void GlController::processAll() {
             }
             glBindVertexArray(0);
             
-            mesh->uploaded = true;
+            mesh->setUploaded(true);
             mesh->vertices = mesh->buffer.size();
             mesh->clearBuffers();
         }
@@ -51,7 +65,7 @@ void GlController::processAll() {
         std::lock_guard<std::mutex> lk(meshDeleteMutex);
         while (!glDelete.empty()) {
             gl_delete_cmd pr = glDelete.front();
-            glDelete.pop();
+            glDelete.pop_front();
 
             glDeleteVertexArrays(1, &pr.vao);
             glDeleteBuffers(1, &pr.vbo);

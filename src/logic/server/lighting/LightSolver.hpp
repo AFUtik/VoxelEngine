@@ -65,8 +65,6 @@ public:
 };
 
 class BasicLightSolver {
-	
-
 	void processBoundaryBlockSingle(
 		Chunk* A, Chunk* B,
 		int ax, int ay, int az,
@@ -104,21 +102,16 @@ public:
 	 * Propagates light sun top to bottom.
 	 * @param chunk
 	 */
-	void propagateSunRay(int lx, int lz, Chunk* chunk);
+	void propagateSunRay(int lx, int lz, ChunkPtr &chunk);
 
 	/*
 	 * Calculates light for chunks and neighbours around it.
 	 */
-	void calculateLight(Chunk* chunk);
+	void calculateLight(ChunkPtr &chunk);
 
-	/*
-	 * Calculates light for chunks and neighbours around it.
-	 */
-	void calculateLight(ChunkSnapshot* chunk);
-
-	void removeLightLocally(int lx, int ly, int lz, Chunk* chunk);
+	void removeLightLocally(int lx, int ly, int lz, ChunkPtr &chunk);
 	
-	void placeLightLocally(int lx, int ly, int lz, Emission emission, Chunk* chunk);
+	void placeLightLocally(int lx, int ly, int lz, Emission emission, ChunkPtr &chunk);
 };
 
 #endif /* LIGHTSOLVER_HPP */

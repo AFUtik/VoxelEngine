@@ -30,14 +30,36 @@ void Camera::translate(const glm::dvec3 &dp) {
 	originPosition += dp;
 }
 
+void Camera::update() {
+	originRebase();
+
+	view = glm::lookAt(
+		offsetPosition,
+		offsetPosition + z_dir,
+		y_dir
+	);
+
+	proj = glm::perspective(
+		fov,
+		(float)Window::width / (float)Window::height,
+		0.1f,
+		1000.0f
+	);
+
+	projview = proj * view;
+}
+
+const mat4& Camera::getProjview() {
+	return projview;
+}
+
 mat4 Camera::getProjection() {
 	float aspect = (float)Window::width / (float)Window::height;
 	return glm::perspective(fov, aspect, 0.1f, 1000.0f);
 }
 
-const mat4& Camera::updateView() {
-	view = glm::lookAt(offsetPosition, offsetPosition + z_dir, y_dir);
-	return view;
+const mat4& Camera::getView() {
+	return glm::lookAt(offsetPosition, offsetPosition + z_dir, y_dir);
 }
 
 vec3 Camera::getViewDir() {

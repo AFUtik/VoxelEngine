@@ -10,15 +10,11 @@
 #include "graphics/renderer/BlockRenderer.hpp"
 #include "graphics/renderer/DrawContext.hpp"
 
-#include "logic/blocks/AbstractBlock.hpp"
-#include "logic/blocks/BlockRegistry.hpp"
-#include "logic/blocks/chunk_utils.hpp"
-#include "logic/lighting/LightSolver.hpp"
-#include "logic/blocks/raycast/Raycasting.hpp"
-#include "logic/World.hpp"
-
 #include "graphics/renderer/DrawContext.hpp"
 #include "graphics/renderer/Renderer.hpp"
+
+#include "logic/client/Client.hpp"
+#include "logic/server/Server.hpp"
 
 #include "window/Window.hpp"
 #include "window/Events.hpp"
@@ -38,17 +34,10 @@ template<typename T> using uptr = std::unique_ptr<T>;
 
 int main(int argc, char* argv[])
 {
-	std::cout << "+x" << " " << neighbourIndexFromDelta(1, 0, 0) << std::endl;
-	std::cout << "-x" << " " << neighbourIndexFromDelta(-1, 0, 0) << std::endl;
-	std::cout << "+y" << " " << neighbourIndexFromDelta(0, 1, 0) << std::endl;
-	std::cout << "-y" << " " << neighbourIndexFromDelta(0, -1, 0) << std::endl;
-	std::cout << "+z" << " " << neighbourIndexFromDelta(0, 0, 1) << std::endl;
-	std::cout << "-z" << " " << neighbourIndexFromDelta(0, 0, -1) << std::endl;
-
 	BlockModel model;
-	model.id = 1;
+	model.id = 0;
 	model.fullCube = true;
-	for(int i = 0; i < 6; i++) model.faces[i].texture = 1;
+	for(int i = 0; i < 6; i++) model.faces[i].texture = 0;
 	BlockModelRegistry::registerBlockModel(model);
 
 	std::string absolute_path = std::filesystem::absolute(argv[0]).parent_path().string();
@@ -77,14 +66,20 @@ int main(int argc, char* argv[])
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	
-	World* logic = new World();
 
+	uptr<GlController> glController = std::make_unique<GlController>();
 	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(0, 0, 0), glm::radians(90.0f));
-	uptr<Frustum> frustum = std::make_unique<Frustum>(camera.get());
 
-	DrawContext drawContext(new Renderer(camera.get(), shader.get(), frustum.get()));
-	drawContext.registerRenderer("world_renderer", new BlockRenderer(logic));
+	uptr<Mesher> mesher = std::make_unique<Mesher>(glController.get(), shader.get());
+
+	uptr<IntergratedServer> server = std::make_unique<IntergratedServer>();
+	uptr<Client> client = std::make_unique<Client>(mesher.get(), camera.get());
+
+	server->setClient(client.get());
+	client->setServer(server.get());
+		
+	DrawContext drawContext(new Renderer(client.get(), camera.get()));
+	drawContext.registerRenderer("world_renderer", new BlockRenderer());
 
 	float camX = 0.0f;
 	float camY = 0.0f;
@@ -105,50 +100,27 @@ int main(int argc, char* argv[])
 		
 		timeAccu += frameTime;
 		if (timeAccu >= H) {
+			glController->processAll();
+
+			if (Events::pressed(GLFW_KEY_W)) {
+				camera->translate(camera->zdir() * H * speed);
+			}
+			if (Events::pressed(GLFW_KEY_S)) {
+				camera->translate(-camera->zdir() * H * speed);
+			}
+			if (Events::pressed(GLFW_KEY_D)) {
+				camera->translate(camera->xdir() * H * speed);
+			}
+			if (Events::pressed(GLFW_KEY_A)) {
+				camera->translate(-camera->xdir() * H * speed);
+			}
+
 			if (Events::jpressed(GLFW_KEY_ESCAPE)) {
 				Window::setShouldClose(true);
 			}
 			if (Events::jpressed(GLFW_KEY_TAB)) {
 				Events::toggle_cursor();
 			}
-
-			if (Events::pressed(GLFW_KEY_W)) {
-				logic->enqueuePlayerMove(PlayerMoveInput{camera->zdir()});
-			}
-			if (Events::pressed(GLFW_KEY_S)) {
-				logic->enqueuePlayerMove(PlayerMoveInput{-camera->zdir()});
-			}
-			if (Events::pressed(GLFW_KEY_D)) {
-				logic->enqueuePlayerMove(PlayerMoveInput{camera->xdir()});
-			}
-			if (Events::pressed(GLFW_KEY_A)) {
-				logic->enqueuePlayerMove(PlayerMoveInput{-camera->xdir()});
-			}
-			if (Events::jpressed(GLFW_KEY_H)) {
-				glm::ivec3 pos = worldToChunk3(camera->getPosition());
-				auto chunk = logic->getChunk(pos.x, pos.y, pos.z);
-			}
-			if (Events::jpressed(GLFW_KEY_J)) {
-				BlockHit hit = raycastBlock(camera->getPosition(), camera->getViewDir(), 15.5, logic);
-				if(hit.hit) logic->enqueueCommand([logic=logic, hit] {
-					AbstractBlock block;
-					block.id = 0;
-					block.emission = {0, 0, 15, 15};
-
-					logic->placeBlock(hit.x, hit.y + 1, hit.z, block);
-				});
-			}
-			if (Events::pressed(GLFW_KEY_SPACE)) {
-				camera->setydir(glm::dvec3(0, 1, 0));
-
-				logic->enqueuePlayerMove(PlayerMoveInput{camera->ydir()});
-			}
-			if (Events::pressed(GLFW_KEY_LEFT_SHIFT)) {
-				camera->setydir(glm::dvec3(0, 1, 0));
-
-				logic->enqueuePlayerMove(PlayerMoveInput{-camera->ydir()});
-			}
-
 			if (Events::_cursor_locked) {
 				camY += -Events::deltaY / Window::height * 2;
 				camX += -Events::deltaX / Window::height * 2;
@@ -163,19 +135,17 @@ int main(int argc, char* argv[])
 				camera->setRotation(glm::mat4(1.0f));
 				camera->rotate(camY, camX, 0);
 			}
-			camera->set(logic->getPlayerPos());
+
+			client->physicsProcess(H);
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			camera->originRebase();
+			camera->update();
 			shader->use();
-
-			glm::mat4 projview = camera->getProjection() * camera->updateView();
 			
-			shader->uniformMatrix("projview", projview);
+			shader->uniformMatrix("projview", camera->getProjview());
 			texture->bind();
 
-			frustum->update(projview);
 			drawContext.render();
 
 			Window::swapBuffers();
@@ -187,9 +157,6 @@ int main(int argc, char* argv[])
         	std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
 		}
 	}
-
-	delete logic;
-
 	Window::terminate();
 	return 0;
 }

@@ -2,12 +2,10 @@
 #define WORLD_HPP
 
 // STD
-#include <map>
-#include <memory>
+#include <ptypes.hpp>
 
 // LOGIC
 #include "blocks/Chunk.hpp"
-#include "blocks/ChunkCompressor.hpp"
 #include "lighting/LightSolver.hpp"
 #include "gen/noise/PerlinNoise.hpp"
 #include "gen/MengerSpongeGenerator.hpp"
@@ -22,25 +20,19 @@ class World {
 
 	MengerSpongeGenerator menger;
 	PerlinNoise noise;
-	int loadDistance = 2;
 	
-	std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess> chunkMap;
+	std::map<Vector3I, ChunkPtr> chunkMap;
+	Vector3I lastPlayerChunk = Vector3I(INT_MIN, 0, INT_MIN);
+
+	int loadDistance = 3;
+
+	void loadNeighbours(ChunkPtr chunk);
+	void generate(ChunkPtr chunk);
 	
-	int last_cx = 0, last_cy = 0, last_cz = 0;
-
-	void loadNeighbours(std::shared_ptr<Chunk> chunk);
-	void updateChunk(std::shared_ptr<Chunk> chunk);
-	void updateLight(std::shared_ptr<Chunk> chunk);
-
-	void generate(std::shared_ptr<Chunk> chunk);
-	void generate(ChunkSnapshot *chunk);
-
 	friend class BlockRenderer;
 	friend class Mesher;
 public:
-	const std::map<ChunkPos, std::shared_ptr<Chunk>, ChunkPosLess>& getChunkMap() {
-		return chunkMap;
-	}
+	const auto& getChunkMap() {return chunkMap;}
 
 	void generateChunk(int cx, int cy, int cz);
 	void unloadChunk  (int cx, int cy, int cz);
@@ -48,7 +40,7 @@ public:
 	void destroyBlock (int gx, int gy, int gz);
 	void placeBlock   (int gx, int gy, int gz, AbstractBlock &b);
 
-	World();
+	World(int loadDisntace);
 	~World();
 
 	block getBlock(int x, int y, int z);
@@ -56,9 +48,8 @@ public:
 	ChunkPtr getChunkByBlock(int x, int y, int z);
 
 	unsigned char getLight(int x, int y, int z, int channel);
-	void set(int x, int y, int z, int id);
 
-	void load(double x, double y, double z);
+	void loadWithDistance(double x, double y, double z);
 };
 
 #endif // !CHUNKS_HPP

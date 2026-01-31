@@ -16,9 +16,9 @@ void MengerSpongeGenerator::generate(ChunkPtr ptr) {
     for(int z = 0; z < ChunkInfo::DEPTH;  z++)
     for(int y = 0; y < ChunkInfo::HEIGHT; y++) 
     {
-        int gx = abs((x+ptr->x*ChunkInfo::WIDTH )%54);
-        int gy = abs((y+ptr->y*ChunkInfo::HEIGHT)%54);
-        int gz = abs((z+ptr->z*ChunkInfo::DEPTH )%54);
+        int gx = abs((x+ptr->pos.x*ChunkInfo::WIDTH )%54);
+        int gy = abs((y+ptr->pos.y*ChunkInfo::HEIGHT)%54);
+        int gz = abs((z+ptr->pos.z*ChunkInfo::DEPTH )%54);
  
         int solid = fractal.getBlock(gx, gy, gz).id;
         if(solid) ptr->setBlock(x, y, z, solid);

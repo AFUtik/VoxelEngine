@@ -3,13 +3,14 @@
 
 #include <memory>
 #include <mutex>
+#include <atomic>
 
 #include "../vertex/VertexInfo.hpp"
 
 class GlController;
 
 class Mesh {
-	GlController* glContoller;
+	GlController* glController;
 	
 	friend class GlController;
 	friend class ChunkMesher;
@@ -18,7 +19,7 @@ public:
 	std::vector<Vertex> buffer;
 	std::vector<uint32_t> indices;
 	
-	bool uploaded = false;
+	std::atomic<bool> uploaded;
 	
 	int vertices = 0; 
 
@@ -30,17 +31,22 @@ public:
 		//indices.reserve(4096);
 	}
 
-	mutable std::mutex mutex;
-
 	Mesh(GlController* glController);
 
 	~Mesh();
 
-	inline bool isUploaded() {return uploaded;}
+	inline bool isUploaded() const noexcept {
+		return uploaded.load(std::memory_order_acquire);
+	}
+
+	inline void setUploaded(bool v) {
+		uploaded.store(v, std::memory_order_release);
+	}
 
 	void update();
-
-	void draw(unsigned int primitive) const;
+	void draw() const;
 };
+
+using MeshPtr = std::shared_ptr<Mesh>;
 
 #endif /* GRAPHICS_MESH_H_ */

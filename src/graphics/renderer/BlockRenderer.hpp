@@ -13,10 +13,8 @@ class Frustum;
 #include "GlController.hpp"
 
 class BlockRenderer : public Renderer {
-	World* world;
-	Mesher mesher;
 public:
-	BlockRenderer(World* chunks) : world(chunks), mesher(chunks) {}
+	BlockRenderer() {}
 
 	void render() override;
 };

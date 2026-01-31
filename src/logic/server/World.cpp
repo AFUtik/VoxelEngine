@@ -1,22 +1,20 @@
 
 #include "World.hpp"
-#include "logic/blocks/ChunkInfo.hpp"
-#include "logic/blocks/chunk_utils.hpp"
-#include <atomic>
-#include <memory>
-#include <chrono>
-#include <mutex>
-#include <shared_mutex>
+#include "blocks/ChunkInfo.hpp"
+#include "blocks/chunk_utils.hpp"
 
 using namespace glm;
 
 #include <math.h>
 #include <limits.h>
 
-World::World() : noise(0), menger(81, 3), lightSolver(this)  {
+World::World(int loadDistance) : noise(0), menger(81, 3), loadDistance(loadDistance), lightSolver(this)  {
 	noise.octaves = 2;
     noise.base_freq = 1.0f;
     //noise.lacunarity = 1.2f;
+
+    ChunkPtr chunk = std::make_shared<Chunk>(Vector3I(1, 0, 1));
+    generate(chunk);
 }
 
 World::~World() {}
@@ -31,9 +29,9 @@ void World::destroyBlock(int x, int y, int z) {
     if(!chunk) return;
 
     chunk->setBlock(lx, ly, lz, 0); 
-    lightSolver.removeLightLocally(lx, ly, lz, chunk.get());
+    lightSolver.removeLightLocally(lx, ly, lz, chunk);
 
-    updateChunk(chunk);
+    //updateChunk(chunk);
 }
 
 void World::placeBlock(int x, int y, int z, AbstractBlock &b) {
@@ -44,9 +42,9 @@ void World::placeBlock(int x, int y, int z, AbstractBlock &b) {
     if(!chunk) return;
 
     chunk->setBlock(lx, ly, lz, b.getId());
-    lightSolver.placeLightLocally(lx, ly, lz, b.getEmission(), chunk.get());
+    lightSolver.placeLightLocally(lx, ly, lz, b.getEmission(), chunk);
 
-    updateChunk(chunk);
+    //updateChunk(chunk);
 }
 
 block World::getBlock(int x, int y, int z) {
@@ -54,7 +52,7 @@ block World::getBlock(int x, int y, int z) {
 	int cy = floorDiv(y, ChunkInfo::HEIGHT);
 	int cz = floorDiv(z, ChunkInfo::DEPTH);
 		
-	auto it = chunkMap.find(ChunkPos{cx, cy, cz});
+	auto it = chunkMap.find(Vector3I(cx, cy, cz));
 	if (it == chunkMap.end()) return block{0};
 	Chunk* chunk = it->second.get();
 
@@ -70,7 +68,7 @@ unsigned char World::getLight(int x, int y, int z, int channel) {
 	int cy = floorDiv(y, ChunkInfo::HEIGHT);
 	int cz = floorDiv(z, ChunkInfo::DEPTH);
 
-	auto it = chunkMap.find(ChunkPos{cx, cy, cz});
+	auto it = chunkMap.find(Vector3I{cx, cy, cz});
 	if (it == chunkMap.end()) return 0;
 	Chunk* chunk = it->second.get();
 
@@ -94,9 +92,9 @@ void World::generate(ChunkPtr chunk)
     for (int x = 0; x < ChunkInfo::WIDTH;  x++) 
     for (int y = 0; y < ChunkInfo::HEIGHT; y++) 
     {
-        int gx = x + chunk->x * (int)ChunkInfo::WIDTH;
-        int gz = z + chunk->z * (int)ChunkInfo::DEPTH;
-        int gy = y + chunk->y * (int)ChunkInfo::HEIGHT;
+        int gx = x + chunk->pos.x * (int)ChunkInfo::WIDTH;
+        int gz = z + chunk->pos.z * (int)ChunkInfo::DEPTH;
+        int gy = y + chunk->pos.y * (int)ChunkInfo::HEIGHT;
 
         float n = noise.noise(
             gx * scale2,
@@ -113,46 +111,45 @@ void World::generateChunk(int x, int y, int z) {
     auto it = chunkMap.find({x, y, z});
     if (it != chunkMap.end()) return;
         
-    ChunkPtr chunk = std::make_shared<Chunk>(x, y, z);
+    ChunkPtr chunk = std::make_shared<Chunk>(Vector3I{x, y, z});
     loadNeighbours(chunk);
     generate(chunk);
 
     lightSolver.propagateSunLight(chunk.get());
-    lightSolver.calculateLight(chunk.get());
+    lightSolver.calculateLight(chunk);
 
-    chunkMap.emplace(chunk->hash_pos, chunk);
+    chunkMap.emplace(chunk->pos, chunk);
 }
 
 void World::unloadChunk(int cx, int cy, int cz) {
     auto it = chunkMap.find({cx, cy, cz});
     if (it == chunkMap.end()) return;
     
-    chunkMap.erase(ChunkPos{cx, cy, cz});
+    chunkMap.erase(Vector3I{cx, cy, cz});
 }
 
 std::shared_ptr<Chunk> World::getChunkByBlock(int x, int y, int z) {
 	int cx = floorDiv(x, ChunkInfo::WIDTH);
 	int cy = floorDiv(y, ChunkInfo::HEIGHT);
 	int cz = floorDiv(z, ChunkInfo::DEPTH);
-	auto it = chunkMap.find(ChunkPos{cx, cy, cz});
+	auto it = chunkMap.find(Vector3I{cx, cy, cz});
 	if (it == chunkMap.end()) return nullptr;
 	return it->second;
 }
 
 std::shared_ptr<Chunk> World::getChunk(int x, int y, int z) {
-	ChunkPos key{x, y, z};
-	auto it = chunkMap.find(key);
+	auto it = chunkMap.find(Vector3I{x, y, z});
 	if (it == chunkMap.end()) return nullptr;
 	return it->second;
 }
 
-void World::loadNeighbours(std::shared_ptr<Chunk> chunk) {
+void World::loadNeighbours(ChunkPtr chunk) {
     for (int i = 0; i < 26; ++i) {
-        int nx = chunk->x + OFFSETS[i][0];
-        int ny = chunk->y + OFFSETS[i][1];
-        int nz = chunk->z + OFFSETS[i][2];
+        int nx = chunk->pos.x + OFFSETS[i][0];
+        int ny = chunk->pos.y + OFFSETS[i][1];
+        int nz = chunk->pos.z + OFFSETS[i][2];
 
-        auto it = chunkMap.find(ChunkPos{nx, ny, nz});
+        auto it = chunkMap.find(Vector3I{nx, ny, nz});
         if (it != chunkMap.end()) {
             auto& neigh = it->second;
 
@@ -162,33 +159,28 @@ void World::loadNeighbours(std::shared_ptr<Chunk> chunk) {
     }
 }
 
-// WORLD LOADING //
+void World::loadWithDistance(double x, double y, double z) {
+    Vector3I playerChunk = { floorDiv(x, ChunkInfo::WIDTH), floorDiv(y, ChunkInfo::HEIGHT), floorDiv(z, ChunkInfo::DEPTH) };
 
-void World::load(double x, double y, double z) {
-    int cx = floorDiv(x, ChunkInfo::WIDTH);
-    int cy = floorDiv(y, ChunkInfo::HEIGHT);
-    int cz = floorDiv(z, ChunkInfo::DEPTH);
-
-    auto c = getChunk(cx, cy, cz);
+    auto c = getChunk(playerChunk.x, playerChunk.y, playerChunk.z);
     std::vector<ChunkPtr> toUnload;
-    for (auto& [pos, chunk] : chunkMap) {
-        if (!((abs(x - pos.x) <= loadDistance) &&
-              (abs(y - pos.y) <= loadDistance) &&
-              (abs(z - pos.z) <= loadDistance))) 
-        {
-            toUnload.push_back(chunk);
+
+	if (playerChunk != lastPlayerChunk) {
+        for (auto& [pos, chunk] : chunkMap) {
+            if (!((abs(x - pos.x) <= loadDistance) &&
+                  (abs(y - pos.y) <= loadDistance) &&
+                  (abs(z - pos.z) <= loadDistance))) 
+            {
+                toUnload.push_back(chunk);
+            }
         }
-    }
-    for (auto& chunk : toUnload) unloadChunk(chunk->x, chunk->y, chunk->z);
-       
-	if (cx != last_cx || cy != last_cy || cz != last_cz) {
-		for (int x = cx - loadDistance; x <= cx + loadDistance; x++) {
-            for (int z = cz - loadDistance; z <= cz + loadDistance; z++) {
+        for (auto& chunk : toUnload) unloadChunk(chunk->pos.x, chunk->pos.y, chunk->pos.z);
+
+        for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
+            for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
                 generateChunk(x, 0, z);
             }
         }
-		last_cx = cx;
-        last_cy = cy;
-        last_cz = cz;
+        lastPlayerChunk = playerChunk;
 	}
 }

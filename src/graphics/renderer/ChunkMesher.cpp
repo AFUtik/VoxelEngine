@@ -148,7 +148,7 @@ void ChunkMesher::make() {
     const unordered_map<size_t, vector<VoxelFace>>& posz_map = zx_faces[static_cast<size_t>(FaceDirection::POS_Z)];
     const unordered_map<size_t, vector<VoxelFace>>& negz_map = zx_faces[static_cast<size_t>(FaceDirection::NEG_Z)];
 
-    constexpr float uvsize = 16.0f / 512.0f;
+    constexpr float uvsize = 32.0f / 32.0f;
     for(const auto& p : posx_map) 
     for(const auto& f : p.second) 
     {
@@ -158,8 +158,8 @@ void ChunkMesher::make() {
         float y2 = f.maxY+1;
         float z2 = f.maxZ+1;
 
-        float u1 = ((f.texture % 32) * uvsize)  + (f.maxZ - f.minZ);
-        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceXPlane(x2, y1, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -173,8 +173,8 @@ void ChunkMesher::make() {
         float y2 = f.maxY+1;
         float z2 = f.maxZ+1;
 
-        float u1 = ((f.texture % 32) * uvsize)    + (f.maxZ - f.minZ);
-        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNXPlane(x1, y1, z1, x1, y2, z2, u1, v1, u2, v2, f.light);
@@ -186,8 +186,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ+1;
         float x2 = f.maxX+1;
 
-        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
-        float v1 = (1 - f.texture / 32.0) + (f.maxZ - f.minZ);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceYPlane(x1, y2, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -199,8 +199,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ+1;
         float x2 = f.maxX+1;
 
-        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
-        float v1 = (1 - f.texture / 32.0) + (f.maxZ - f.minZ);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNYPlane(x1, y1, z1, x2, y1, z2, u1, v1, u2, v2, f.light);
@@ -213,8 +213,8 @@ void ChunkMesher::make() {
         float x2 = f.maxX+1;
         float y2 = f.maxY+1;
 
-        float u1 = ((f.texture % 32) * uvsize)    + (f.maxX - f.minX);
-        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceZPlane(x1, y1, z2, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -227,8 +227,8 @@ void ChunkMesher::make() {
         float x2 = f.maxX+1;
         float y2 = f.maxY+1;
 
-        float u1 = ((f.texture % 32) * uvsize)  + (f.maxX - f.minX);
-        float v1 = (1 - f.texture / 32.0) + (f.maxY - f.minY);
+        float u1 = 0.0f;
+        float v1 = 0.0f;
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNZPlane(x1, y1, z1, x2, y2, z1, u1, v1, u2, v2, f.light);
@@ -237,29 +237,30 @@ void ChunkMesher::make() {
 
 void Mesher::meshWorkerThread() {
     while (true) {
-            std::unique_ptr<ChunkSnapshot> snap;
-            {
-                std::unique_lock lk(world->readyQueueMutex);
-                world->readyCv.wait(lk, [&] {
-                    return stop || !world->readyChunks.empty();
-                });
-                if (stop && world->readyChunks.empty())
-                    break;
-
-                snap = std::move(world->readyChunks.front());
-                world->readyChunks.pop_front();
-            }
-            std::shared_ptr<Chunk> org = snap->source;
-
-            if(!org) continue;
-            if(org->checkState(ChunkState::Finished)) {
-                auto mesh = make_shared<Mesh>(glController.get());
-                ChunkMesher chunkMesher(snap.get(), mesh.get());
-                chunkMesher.make(); 
-                {
-                    std::unique_lock<std::mutex> wlock(meshUploadMutex);
-                    meshUploadQueue.push({org, mesh});
-                }
-            }
+        std::shared_ptr<ChunkClient> clientChunk;
+        {
+            std::unique_lock<std::mutex> lk(buildMeshMutex);
+            buildMeshCVar.wait(lk, [&] {
+                return stop || !buildMeshDeq.empty();
+            });
+            if (stop && buildMeshDeq.empty())
+                break;
+            clientChunk = buildMeshDeq.front(); buildMeshDeq.pop_front();
         }
+        MeshPtr mesh = glController->createMesh();
+
+        ChunkMesher chunkMesher(clientChunk->getChunk().get(), mesh.get());
+        chunkMesher.make(); 
+
+        clientChunk->meshInstance.mesh   = mesh;
+        clientChunk->meshInstance.shader = shader;
+
+        glController->queueUpload(mesh);
     }
+}
+
+void Mesher::queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient) {
+    std::unique_lock<std::mutex> lock(buildMeshMutex);
+    buildMeshDeq.push_front(chunkClient);
+    buildMeshCVar.notify_one();
+}

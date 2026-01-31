@@ -2,7 +2,7 @@
 #define GLCONTROLLER_HPP
 
 #include "../vertex/VertexInfo.hpp"
-#include <queue>
+#include <deque>
 #include <memory>
 #include <mutex>
 
@@ -23,13 +23,17 @@ class Mesh;
 
 class GlController {
 public:
-    std::queue<gl_delete_cmd> glDelete;
-    std::queue<std::shared_ptr<Mesh>> glUpdate;
-    std::queue<std::shared_ptr<Mesh>> glUpload;
+    std::deque<gl_delete_cmd> glDelete;
+    std::deque<std::shared_ptr<Mesh>> glUpdate;
+    std::deque<std::shared_ptr<Mesh>> glUpload;
 
     std::mutex meshDeleteMutex;
     std::mutex meshUpdateMutex;
     std::mutex meshUploadMutex;
+
+    std::shared_ptr<Mesh> createMesh();
+    void queueUpload(std::shared_ptr<Mesh> mesh);
+    void queueFree  (std::shared_ptr<Mesh> mesh);
 
     void processAll();
 };

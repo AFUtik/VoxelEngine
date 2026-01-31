@@ -36,7 +36,7 @@ BlockHit raycastBlock(const glm::dvec3& origin,
     double dist = 0.0;
     
     while (dist <= maxDistance) {
-        glm::ivec3 chunkCoord = worldToChunk3(blockPos);
+        glm::ivec3 chunkCoord = { 0, 0, 0 };
         std::shared_ptr<Chunk> chunk = world->getChunk(chunkCoord.x, chunkCoord.y, chunkCoord.z);
         if (chunk) {
             int lx, ly, lz;

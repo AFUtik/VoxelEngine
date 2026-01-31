@@ -15,7 +15,7 @@ const int OFFS[6][3] = {
 LightSolver::LightSolver(World* chunks, int channel) : chunks(chunks), channel(channel) {
 }
 
-void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk) {
+void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk *chunk) {
 	if (emission <= 1)
 		return;
 
@@ -32,7 +32,7 @@ void LightSolver::addLocally(int x, int y, int z, uint8_t emission, Chunk* chunk
 	chunk->setLight(x, y, z, channel, entry.light);
 }
 
-void LightSolver::addLocally(int x, int y, int z, Chunk* chunk) {
+void LightSolver::addLocally(int x, int y, int z, Chunk *chunk) {
 	addLocally(x, y, z, chunk->getLight(x, y, z, channel), chunk);
 }
 
@@ -73,13 +73,11 @@ void LightSolver::solve() {
 
 					
 					remqueue.write(nentry);
-					chunk->dirtyHot();
 					chunk->setLight(lx, ly, lz, channel, 0);
 				}
 				else if (light >= entry.light) {
 					LightEntry nentry{lx, ly, lz, light, chunk};
 
-					chunk->dirtyHot();
 					addqueue.write(nentry);
 				}
 			}
@@ -118,7 +116,6 @@ void LightSolver::solve() {
 				uint8_t nl = entry.light-1;
 				LightEntry nentry{lx, ly, lz, nl, chunk};
 
-				chunk->dirtyHot();
 				addqueue.write(nentry);
 			}
 		}
@@ -211,43 +208,41 @@ void BasicLightSolver::propagateSunLight(Chunk* chunk) {
 			}
 		}
 	}*/
-	{
-		std::unique_lock<std::shared_mutex> wlock(chunk->dataMutex);
-		for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-			for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-				for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-					block vox = chunk->getBlock(x, y, z);
-					if (vox.id != 0) {
-						break;
-					}
-					chunk->setLight(x, y, z, 3, 0xF);
+	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+				block vox = chunk->getBlock(x, y, z);
+				if (vox.id != 0) {
+					break;
 				}
+				chunk->setLight(x, y, z, 3, 0xF);
 			}
 		}
+	}
 	
-		for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-			for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-				for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-					block vox = chunk->getBlock(x, y, z);
-					if (vox.id != 0) {
-						break;
-					}
-					if (
-						chunk->getBoundLight(x-1, y, z, 3) == 0 ||
-						chunk->getBoundLight(x+1, y, z, 3) == 0 ||
-						chunk->getBoundLight(x, y-1, z, 3) == 0 ||
-						chunk->getBoundLight(x, y+1, z, 3) == 0 ||
-						chunk->getBoundLight(x, y, z-1, 3) == 0 ||
-						chunk->getBoundLight(x, y, z+1, 3) == 0
-						) solverS->addLocally(x, y, z, chunk);   
-					chunk->setLight(x, y, z, 3, 0xF);
+	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+				block vox = chunk->getBlock(x, y, z);
+				if (vox.id != 0) {
+					break;
 				}
+				if (
+					chunk->getBoundLight(x-1, y, z, 3) == 0 ||
+					chunk->getBoundLight(x+1, y, z, 3) == 0 ||
+					chunk->getBoundLight(x, y-1, z, 3) == 0 ||
+					chunk->getBoundLight(x, y+1, z, 3) == 0 ||
+					chunk->getBoundLight(x, y, z-1, 3) == 0 ||
+					chunk->getBoundLight(x, y, z+1, 3) == 0
+					) solverS->addLocally(x, y, z, chunk);   
+				chunk->setLight(x, y, z, 3, 0xF);
 			}
 		}
 	}
 }
 
-void BasicLightSolver::propagateSunRay(int lx, int lz, Chunk* chunk) {
+void BasicLightSolver::propagateSunRay(int lx, int lz, ChunkPtr &chunk) {
+	Chunk* raw = chunk.get();
 	for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
 		block vox = chunk->getBlock(lx, y, lz);
 		if (vox.id != 0) {
@@ -268,19 +263,18 @@ void BasicLightSolver::propagateSunRay(int lx, int lz, Chunk* chunk) {
 			chunk->getBoundLight(lx, y+1, lz, 3) == 0 ||
 			chunk->getBoundLight(lx, y, lz-1, 3) == 0 ||
 			chunk->getBoundLight(lx, y, lz+1, 3) == 0
-			) solverS->addLocally(lx, y, lz, chunk);   
+			) solverS->addLocally(lx, y, lz, raw);   
 		chunk->setLight(lx, y, lz, 3, 0xF);
 	}
 }
 
-void BasicLightSolver::calculateLight(Chunk *chunk) {
+void BasicLightSolver::calculateLight(ChunkPtr &chunk) {
 	std::array<bool,4> addedAnyGlobal = {false,false,false,false};
     for (int face = 0; face < 6; ++face) {
 		Chunk* neigbour = chunk->getNeigbourByFace(face);
 		if(!neigbour) continue;
 
-		syncBoundaryWithNeigbour(chunk, neigbour, face, addedAnyGlobal);
-		neigbour->dirty();
+		syncBoundaryWithNeigbour(chunk.get(), neigbour, face, addedAnyGlobal);
     }
 
 	solverR->solve();
@@ -289,70 +283,11 @@ void BasicLightSolver::calculateLight(Chunk *chunk) {
 	solverS->solve();
 }
 
-void BasicLightSolver::calculateLight(ChunkSnapshot *chunk) {
-	std::queue<LightLocal> addqueue;
-	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-				block vox = chunk->getBlock(x, y, z);
-				if (vox.id != 0) {
-					break;
-				}
-				chunk->setLight(x, y, z, 3, 0xF);
-			}
-		}
-	}
-
-	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-				block vox = chunk->getBlock(x, y, z);
-				if (vox.id != 0) {
-					break;
-				}
-				if (
-					chunk->getBoundLight(x-1, y, z, 3) == 0 ||
-					chunk->getBoundLight(x+1, y, z, 3) == 0 ||
-					chunk->getBoundLight(x, y-1, z, 3) == 0 ||
-					chunk->getBoundLight(x, y+1, z, 3) == 0 ||
-					chunk->getBoundLight(x, y, z-1, 3) == 0 ||
-					chunk->getBoundLight(x, y, z+1, 3) == 0
-					) addqueue.push({x, y, z, chunk->getLight(x, y, z, 3), 3});
-			}
-		}
-	}
-
-	while (!addqueue.empty()) {
-		LightLocal entry = addqueue.front(); addqueue.pop();
-		if (entry.light <= 1) continue;
-		for (size_t i = 0; i < 6; i++) {
-			const int x = entry.lx + OFFS[i][0];
-			const int y = entry.ly + OFFS[i][1];
-			const int z = entry.lz + OFFS[i][2];
-			if(!Chunk::inside(x, y, z)) continue;
-
-			bool should_propagate = false;
-			block v = chunk->getBlock(x, y, z);
-			unsigned char curLight = chunk->getLight(x, y, z, entry.channel);
-
-			if (v.id == 0 && static_cast<int>(curLight) + 1 < entry.light) should_propagate = true;
-
-			if(should_propagate) {
-				chunk->setLight(x, y, z, entry.channel, entry.light - 1);
-				uint8_t nl = entry.light-1;
-				LightLocal nentry{x, y, z, nl, entry.channel};
-
-				addqueue.push(nentry);
-			}
-		}
-	}
-}
-
-void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, Chunk *chunk) {
-	solverR->removeLocally(lx, ly, lz, chunk);
-	solverG->removeLocally(lx, ly, lz, chunk);
-	solverB->removeLocally(lx, ly, lz, chunk);
-	solverS->removeLocally(lx, ly, lz, chunk);
+void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, ChunkPtr &chunk) {
+	solverR->removeLocally(lx, ly, lz, chunk.get());
+	solverG->removeLocally(lx, ly, lz, chunk.get());
+	solverB->removeLocally(lx, ly, lz, chunk.get());
+	solverS->removeLocally(lx, ly, lz, chunk.get());
 
 	solverR->solve();
 	solverG->solve();
@@ -367,35 +302,30 @@ void BasicLightSolver::removeLightLocally(int lx, int ly, int lz, Chunk *chunk) 
         Chunk* neighbour = chunk->getNeigbourByFace(face);
         if (!neighbour) continue;
 
-        syncBoundaryWithNeigbour(chunk, neighbour, face, addedAny);
-		neighbour->dirty();
+        syncBoundaryWithNeigbour(chunk.get(), neighbour, face, addedAny);
     }
 
     if(addedAny[0]) solverR->solve();
     if(addedAny[1]) solverG->solve();
     if(addedAny[2]) solverB->solve();
     if(addedAny[3]) solverS->solve();
-	
-	chunk->dirty();
 }
 
-void BasicLightSolver::placeLightLocally(int lx, int ly, int lz, Emission emission, Chunk *chunk) {
+void BasicLightSolver::placeLightLocally(int lx, int ly, int lz, Emission emission, ChunkPtr &chunk) {
 	if(emission.r) {
-		solverR->addLocally(lx, ly, lz, emission.r, chunk);
+		solverR->addLocally(lx, ly, lz, emission.r, chunk.get());
 		solverR->solve();
 	} 
 	if(emission.g) {
-		solverG->addLocally(lx, ly, lz, emission.g, chunk);
+		solverG->addLocally(lx, ly, lz, emission.g, chunk.get());
 		solverG->solve();
 	}
 	if(emission.b) {
-		solverB->addLocally(lx, ly, lz, emission.b, chunk);
+		solverB->addLocally(lx, ly, lz, emission.b, chunk.get());
 		solverB->solve();
 	}
 	if(emission.s) {
-		//propagateSunRay(lx, lz, chunk);
-
-		solverS->addLocally(lx, ly, lz, emission.s, chunk);
+		solverS->addLocally(lx, ly, lz, emission.s, chunk.get());
 		solverS->solve();
 	}
 }

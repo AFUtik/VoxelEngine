@@ -10,19 +10,19 @@
 class Frustum;
 class Shader;
 class Camera;
-class Drawable;
+class MeshInstance;
+class Client; 
 
 class Renderer {
 protected:    
-    std::vector<Drawable*> drawable; 
-
+    std::vector<MeshInstance*> drawable; 
+       
+    Client* client = nullptr;
     Camera* camera = nullptr; 
-    Shader* shader = nullptr;
-    Frustum* frustum = nullptr;
 
     friend class DrawContext;
 public:
-    Renderer(Camera* camera, Shader* shader, Frustum* frustum) : camera(camera), shader(shader), frustum(frustum) {}
+    Renderer(Client* client, Camera* camera) : client(client), camera(camera) {}
     
     Renderer() = default;
     

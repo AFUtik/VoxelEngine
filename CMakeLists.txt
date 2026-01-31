@@ -7,8 +7,6 @@ cmake_minimum_required (VERSION 3.8)
 
 set(CMAKE_CXX_STANDARD 17)
 
-#set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/x64-windows/share)
-
 set(PROJECT_NAME VoxelEngine)
 
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
@@ -26,5 +24,6 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PNG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(zstd CONFIG REQUIRED)
 
-target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW ZLIB::ZLIB PNG::PNG glm::glm)
+target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW ZLIB::ZLIB PNG::PNG glm::glm zstd::libzstd)
