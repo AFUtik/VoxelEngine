@@ -123,12 +123,12 @@ void BlockModelCubeMaker::addFaceNZPlane(float x1, float y1, float z1, float x2,
 void ChunkMesher::addCube(int block, int lx, int ly, int lz) {
     const BlockModel& model = BlockModelRegistry::get(block);
 
-    if (!chunk->getBoundBlock(lx, ly+1, lz).isOpaque()) addFace<FaceDirection::POS_Y>(model, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly-1, lz).isOpaque()) addFace<FaceDirection::NEG_Y>(model, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx+1, ly, lz).isOpaque()) addFace<FaceDirection::POS_X>(model, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx-1, ly, lz).isOpaque()) addFace<FaceDirection::NEG_X>(model, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly, lz+1).isOpaque()) addFace<FaceDirection::POS_Z>(model, lx, ly, lz);
-    if (!chunk->getBoundBlock(lx, ly, lz-1).isOpaque()) addFace<FaceDirection::NEG_Z>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly+1, lz).isOpaque()) addFaceGreedy<FaceDirection::POS_Y>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly-1, lz).isOpaque()) addFaceGreedy<FaceDirection::NEG_Y>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx+1, ly, lz).isOpaque()) addFaceGreedy<FaceDirection::POS_X>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx-1, ly, lz).isOpaque()) addFaceGreedy<FaceDirection::NEG_X>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly, lz+1).isOpaque()) addFaceGreedy<FaceDirection::POS_Z>(model, lx, ly, lz);
+    if (!chunk->getBoundBlock(lx, ly, lz-1).isOpaque()) addFaceGreedy<FaceDirection::NEG_Z>(model, lx, ly, lz);
 }
 
 void ChunkMesher::make() {
@@ -148,91 +148,91 @@ void ChunkMesher::make() {
     const unordered_map<size_t, vector<VoxelFace>>& posz_map = zx_faces[static_cast<size_t>(FaceDirection::POS_Z)];
     const unordered_map<size_t, vector<VoxelFace>>& negz_map = zx_faces[static_cast<size_t>(FaceDirection::NEG_Z)];
 
-    constexpr float uvsize = 32.0f / 32.0f;
-    for(const auto& p : posx_map) 
-    for(const auto& f : p.second) 
-    {
-        float y1 = f.minY;
-        float z1 = f.minZ;
-        float x2 = f.maxX+1;
-        float y2 = f.maxY+1;
-        float z2 = f.maxZ+1;
+    constexpr float uvsize = 32.0f / 512.0f;
+    for (const auto& p : posx_map)
+        for (const auto& f : p.second)
+        {
+            float y1 = f.minY;
+            float z1 = f.minZ;
+            float x2 = f.maxX + 1;
+            float y2 = f.maxY + 1;
+            float z2 = f.maxZ + 1;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
-        float u2 = u1 + uvsize;
-        float v2 = v1 + uvsize;
-        cubeModel.addFaceXPlane(x2, y1, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
-    }
-    for(const auto& p : negx_map) 
-    for(const auto& f : p.second)  
-    {
-        float y1 = f.minY;
-        float z1 = f.minZ;
+            float u1 = 0.0f + (f.maxZ - f.minZ);
+            float v1 = 0.0f + (f.maxY - f.minY);
+            float u2 = u1 + uvsize;
+            float v2 = v1 + uvsize;
+            cubeModel.addFaceXPlane(x2, y1, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
+        }
+    for (const auto& p : negx_map)
+        for (const auto& f : p.second)
+        {
+            float y1 = f.minY;
+            float z1 = f.minZ;
+            float x1 = f.minX;
+            float y2 = f.maxY + 1;
+            float z2 = f.maxZ + 1;
+
+            float u1 = 0.0f + (f.maxZ - f.minZ);
+            float v1 = 0.0f +      (f.maxY - f.minY);
+            float u2 = u1 + uvsize;
+            float v2 = v1 + uvsize;
+            cubeModel.addFaceNXPlane(x1, y1, z1, x1, y2, z2, u1, v1, u2, v2, f.light);
+        }
+    for (const VoxelFace& f : y_faces[static_cast<size_t>(FaceDirection::POS_Y)]) {
         float x1 = f.minX;
-        float y2 = f.maxY+1;
-        float z2 = f.maxZ+1;
-
-        float u1 = 0.0f;
-        float v1 = 0.0f;
-        float u2 = u1 + uvsize;
-        float v2 = v1 + uvsize;
-        cubeModel.addFaceNXPlane(x1, y1, z1, x1, y2, z2, u1, v1, u2, v2, f.light);
-    }
-    for(const VoxelFace& f : y_faces[static_cast<size_t>(FaceDirection::POS_Y)]) {
-        float x1 = f.minX;
         float z1 = f.minZ;
-        float y2 = f.maxY+1;
-        float z2 = f.maxZ+1;
-        float x2 = f.maxX+1;
+        float y2 = f.maxY + 1;
+        float z2 = f.maxZ + 1;
+        float x2 = f.maxX + 1;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
+        float u1 = 0.0f + (f.maxX - f.minX);
+        float v1 = 0.0f + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceYPlane(x1, y2, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
     }
-    for(const VoxelFace& f : y_faces[static_cast<size_t>(FaceDirection::NEG_Y)]) {
+    for (const VoxelFace& f : y_faces[static_cast<size_t>(FaceDirection::NEG_Y)]) {
         float x1 = f.minX;
         float z1 = f.minZ;
         float y1 = f.minY;
-        float z2 = f.maxZ+1;
-        float x2 = f.maxX+1;
+        float z2 = f.maxZ + 1;
+        float x2 = f.maxX + 1;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
+        float u1 = 0.0f + (f.maxX - f.minX);
+        float v1 = 0.0f + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNYPlane(x1, y1, z1, x2, y1, z2, u1, v1, u2, v2, f.light);
     }
-    for(const auto& p : posz_map) 
-    for(const auto& f : p.second) {
-        float x1 = f.minX;
-        float y1 = f.minY;
-        float z2 = f.maxZ+1;
-        float x2 = f.maxX+1;
-        float y2 = f.maxY+1;
+    for (const auto& p : posz_map)
+        for (const auto& f : p.second) {
+            float x1 = f.minX;
+            float y1 = f.minY;
+            float z2 = f.maxZ + 1;
+            float x2 = f.maxX + 1;
+            float y2 = f.maxY + 1;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
-        float u2 = u1 + uvsize;
-        float v2 = v1 + uvsize;
-        cubeModel.addFaceZPlane(x1, y1, z2, x2, y2, z2, u1, v1, u2, v2, f.light);
-    }
-    for(const auto& p : negz_map) 
-    for(const auto& f : p.second) {
-        float x1 = f.minX;
-        float y1 = f.minY;
-        float z1 = f.minZ;
-        float x2 = f.maxX+1;
-        float y2 = f.maxY+1;
+            float u1 = 0.0f + (f.maxX - f.minX);
+            float v1 = 0.0f + (f.maxY - f.minY);
+            float u2 = u1 + uvsize;
+            float v2 = v1 + uvsize;
+            cubeModel.addFaceZPlane(x1, y1, z2, x2, y2, z2, u1, v1, u2, v2, f.light);
+        }
+    for (const auto& p : negz_map)
+        for (const auto& f : p.second) {
+            float x1 = f.minX;
+            float y1 = f.minY;
+            float z1 = f.minZ;
+            float x2 = f.maxX + 1;
+            float y2 = f.maxY + 1;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
-        float u2 = u1 + uvsize;
-        float v2 = v1 + uvsize;
-        cubeModel.addFaceNZPlane(x1, y1, z1, x2, y2, z1, u1, v1, u2, v2, f.light);
-    }
+            float u1 = 0.0f + (f.maxX - f.minX);
+            float v1 = 0.0f + (f.maxY - f.minY);
+            float u2 = u1 + uvsize;
+            float v2 = v1 + uvsize;
+            cubeModel.addFaceNZPlane(x1, y1, z1, x2, y2, z1, u1, v1, u2, v2, f.light);
+        }
 }
 
 void Mesher::meshWorkerThread() {
@@ -247,15 +247,18 @@ void Mesher::meshWorkerThread() {
                 break;
             clientChunk = buildMeshDeq.front(); buildMeshDeq.pop_front();
         }
-        MeshPtr mesh = glController->createMesh();
+        MeshPtr oldMesh = clientChunk->meshInstance.mesh;
+        MeshPtr newMesh = oldMesh && oldMesh->isUploaded() ? oldMesh : glController->createMesh();
 
-        ChunkMesher chunkMesher(clientChunk->getChunk().get(), mesh.get());
-        chunkMesher.make(); 
+        ChunkMesher chunkMesher(clientChunk->getChunk().get(), newMesh.get());
+        chunkMesher.make();
 
-        clientChunk->meshInstance.mesh   = mesh;
         clientChunk->meshInstance.shader = shader;
-
-        glController->queueUpload(mesh);
+        if (!oldMesh) {
+            clientChunk->meshInstance.mesh = newMesh;
+            glController->queueUpload(newMesh);
+        }
+        else glController->queueUpload(newMesh);
     }
 }
 

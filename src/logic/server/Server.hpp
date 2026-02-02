@@ -17,8 +17,12 @@ private:
     World world;
     EntitySystem entitySystem;
 
-    //std::deque<ServerCommand> commands;
-    //std::mutex commandMutex;
+    std::deque<ClientMessage> in;
+    std::mutex inMutex;
+
+    std::deque<ServerMessage> out;
+    std::mutex outMutex;
+
     //std::deque<ServerMessage> out;
     //std::mutex messageMutex;
 
@@ -27,7 +31,9 @@ private:
 
     static const int SERVER_LOADDISTANCE = 3;
 public:
-    void onMessage(ClientMessage cmd);
+    Vector3 pos;
+
+    void onMessage(ClientMessage& cmd);
 
     IntergratedServer() : world(SERVER_LOADDISTANCE), entitySystem(&world) {
         logicThread = std::thread([this] { logicLoop(); });
@@ -42,6 +48,17 @@ public:
         running = false;
         if (logicThread.joinable())
             logicThread.join();
+    }
+
+    inline void sendMessage(ClientMessage msg) {
+        std::lock_guard<std::mutex> lock(inMutex);
+        in.push_front(msg);
+    }
+
+    inline ServerMessage receiveMessage() {
+        std::lock_guard<std::mutex> lock(outMutex);
+        ServerMessage msg = out.front(); out.pop_front();
+        return msg;
     }
 
     inline void setClient(Client* client) {

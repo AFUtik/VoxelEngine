@@ -48,7 +48,11 @@ struct VoxelFace {
       maxZ(std::max(a.maxZ, b.maxZ)), light(a.light) {}
 
     inline static bool checkCanCombineLight(VoxelFace &faceA, VoxelFace &faceB) {
-        return !(faceA.lightKey == faceB.lightKey);
+        if (glm::epsilonEqual(faceA.light.s[0] + faceA.light.s[1] + faceA.light.s[2] + faceA.light.s[3], faceB.light.s[0] + faceB.light.s[1] + faceB.light.s[2] + faceB.light.s[3], 1e-5f)) return false;
+
+        return true;
+
+        //return !(faceA.lightKey == faceB.lightKey);
     }
 
     template<FaceDirection FD> static bool canCombineZWise(VoxelFace &faceA, VoxelFace &faceB) {
@@ -100,6 +104,8 @@ class ChunkMesher {
     BlockModelCubeMaker cubeModel;
     Chunk* chunk;
 
+    bool greedyMeshing = false;
+
     template<size_t Corner>
     inline void mix4_light(
         VoxelFace &face,
@@ -107,7 +113,8 @@ class ChunkMesher {
         int x0, int y0, int z0,
         int x1, int y1, int z1,
         int x2, int y2, int z2
-        ) {
+        ) 
+    {
         face.light.r[Corner] = (chunk->getBoundLight(x0, y0, z0, 0) + cr * 30 + chunk->getBoundLight(x1, y1, z1, 0) + chunk->getBoundLight(x2, y2, z2, 0)) / 75.0f;
         face.light.g[Corner] = (chunk->getBoundLight(x0, y0, z0, 1) + cg * 30 + chunk->getBoundLight(x1, y1, z1, 1) + chunk->getBoundLight(x2, y2, z2, 1)) / 75.0f;
         face.light.b[Corner] = (chunk->getBoundLight(x0, y0, z0, 2) + cb * 30 + chunk->getBoundLight(x1, y1, z1, 2) + chunk->getBoundLight(x2, y2, z2, 2)) / 75.0f;
@@ -129,7 +136,7 @@ class ChunkMesher {
         return key;
     }
 
-    template<FaceDirection FD> inline void addFace(const BlockModel &model, int x, int y, int z) 
+    template<FaceDirection FD> inline void addFaceGreedy(const BlockModel &model, int x, int y, int z) 
     {
         constexpr int dx = FaceDirection::POS_X  == FD ? 1 : FaceDirection::NEG_X  == FD ? -1 : 0;
         constexpr int dy = FaceDirection::POS_Y  == FD ? 1 : FaceDirection::NEG_Y  == FD ? -1 : 0;
@@ -170,10 +177,10 @@ class ChunkMesher {
             mix4_light<2>(curFace, lr, lg, lb, ls, x+1,y+1,z-1, x,y+1,z-1, x+1,y,z-1);
             mix4_light<3>(curFace, lr, lg, lb, ls, x+1,y-1,z-1, x,y-1,z-1, x+1,y,z-1);
         }
-        curFace.lightKey = packLight(curFace.light);
-        
-        if constexpr (FD==FaceDirection::NEG_Y || FD==FaceDirection::POS_Y) {
-            vector<VoxelFace> &faces = y_faces[static_cast<size_t>(FD)];
+        //curFace.lightKey = packLight(curFace.light);
+
+        if constexpr (FD == FaceDirection::NEG_Y || FD == FaceDirection::POS_Y) {
+            vector<VoxelFace>& faces = y_faces[static_cast<size_t>(FD)];
             bool added = false;
             if (!faces.empty()) {
                 VoxelFace& last = faces.back();
@@ -183,21 +190,21 @@ class ChunkMesher {
                 }
             }
             if (!added) faces.push_back(curFace);
-        } else {
-            unordered_map<size_t, vector<VoxelFace>> &mfaces = zx_faces[static_cast<size_t>(FD)];
+        }
+        else {
+            unordered_map<size_t, vector<VoxelFace>>& mfaces = zx_faces[static_cast<size_t>(FD)];
             size_t key = (static_cast<size_t>(z) << 32) | x;
             vector<VoxelFace>& faces = mfaces[key];
             bool added = false;
-            if(!faces.empty()) {
+            if (!faces.empty()) {
                 VoxelFace& last = faces.back();
                 if (VoxelFace::canCombineZWise<FD>(last, curFace)) {
                     faces.back() = VoxelFace(last, curFace);
                     added = true;
                 }
-            } 
-            if(!added) faces.push_back(curFace);
+            }
+            if (!added) faces.push_back(curFace);
         }
-        
     }
 
     void addCube(int block, int lx, int ly, int lz);
@@ -207,6 +214,12 @@ public:
     ChunkMesher(Chunk* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
         for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
     }
+};
+
+enum class MeshBuildType 
+{
+    Default,
+    GreedyMeshing,
 };
 
 class Mesher {

@@ -29,12 +29,14 @@ private:
     std::unordered_map<Vector3I, std::shared_ptr<ChunkClient>> chunks;
     Vector3I lastPlayerChunk = Vector3I(INT_MIN, 0, INT_MIN);
 
+    void loadNeighbours(ChunkPtr chunk);
+
     IntergratedServer* server;
     Camera* camera;
 
     Vector3 playerPos = Vector3(0);
 
-    const static int CLIENT_LOADDISTANCE = 3;
+    const static int CLIENT_LOADDISTANCE = 5;
 
     double inputAccumulator = 0;
     size_t tick = 0;

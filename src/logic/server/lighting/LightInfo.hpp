@@ -19,7 +19,7 @@ struct LightEntry {
 	int32_t ly;
 	int32_t lz;
 	uint8_t light;
-	Chunk *chunk;
+	Chunk* chunk;
 };
 
 struct LightLocal {

@@ -17,19 +17,15 @@ public:
     MeshInstance meshInstance;
     inline ChunkPtr getChunk() { return chunk; }
 
-    ChunkClient(ChunkPtr chunk) : chunk(chunk) 
+    ChunkClient(ChunkPtr chunk) : chunk(chunk)
     {
-        std::cout << chunk->pos.x << ' ' << chunk->pos.z << std::endl;
-        meshInstance.getTransform().setPosition(
+        meshInstance.aabb = AABB(Vector3(0.0f), Vector3(ChunkInfo::WIDTH, ChunkInfo::HEIGHT, ChunkInfo::DEPTH));
+        meshInstance.setPosition(
             Vector3(
                 double(chunk->pos.x) * double(ChunkInfo::WIDTH) ,
                 double(chunk->pos.y) * double(ChunkInfo::HEIGHT) ,
                 double(chunk->pos.z) * double(ChunkInfo::DEPTH)
             )
-        );
-        meshInstance.aabb = AABB(
-            Vector3(double(chunk->pos.x) * ChunkInfo::WIDTH, double(chunk->pos.y) * ChunkInfo::HEIGHT, double(chunk->pos.z) * ChunkInfo::DEPTH),
-            Vector3((double(chunk->pos.x) + 1) * ChunkInfo::WIDTH, (double(chunk->pos.y) + 1) * ChunkInfo::HEIGHT, (double(chunk->pos.z) + 1) * ChunkInfo::DEPTH)
         );
     }
 };

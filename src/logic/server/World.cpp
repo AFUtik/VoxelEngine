@@ -8,16 +8,31 @@ using namespace glm;
 #include <math.h>
 #include <limits.h>
 
-World::World(int loadDistance) : noise(0), menger(81, 3), loadDistance(loadDistance), lightSolver(this)  {
+World::World(int loadDistance) : noise(0), menger(81, 3), lightSolver()  {
 	noise.octaves = 2;
     noise.base_freq = 1.0f;
     //noise.lacunarity = 1.2f;
-
-    ChunkPtr chunk = std::make_shared<Chunk>(Vector3I(1, 0, 1));
-    generate(chunk);
 }
 
 World::~World() {}
+
+void World::genWorker() {
+    while (running) {
+        Vector3I pos;
+        {
+            std::unique_lock<std::mutex> lk(genMutex);
+            genCVar.wait(lk, [&] {
+                return !running || !genDeq.empty();
+                });
+            if (!running && genDeq.empty())
+                break;
+            pos = genDeq.front(); genDeq.pop_front();
+        }
+
+        ChunkPtr chunk = std::make_shared<Chunk>(pos);
+        generate(chunk);
+    }
+}
 
 // BLOCK //
 void World::destroyBlock(int x, int y, int z) {
@@ -181,6 +196,7 @@ void World::loadWithDistance(double x, double y, double z) {
                 generateChunk(x, 0, z);
             }
         }
+
         lastPlayerChunk = playerChunk;
 	}
 }

@@ -8,9 +8,9 @@
 #include <cstdint>
 
 struct ChunkInfo {
-    static const inline int32_t WIDTH  = 32;
+    static const inline int32_t WIDTH  = 16;
     static const inline int32_t HEIGHT = 256;
-    static const inline int32_t DEPTH  = 32;
+    static const inline int32_t DEPTH  = 16;
     static const inline int32_t VOLUME = WIDTH * HEIGHT * DEPTH;
 };
 

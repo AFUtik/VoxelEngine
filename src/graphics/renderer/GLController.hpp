@@ -12,13 +12,6 @@ struct gl_delete_cmd {
     uint32_t ebo;
 };
 
-struct gl_update_cmd {
-    uint32_t vbo; 
-    uint32_t vertices;
-    uint32_t verticesUpdated;
-    Vertex*  verticesPtr;
-};
-
 class Mesh;
 
 class GlController {
@@ -32,6 +25,8 @@ public:
     std::mutex meshUploadMutex;
 
     std::shared_ptr<Mesh> createMesh();
+
+    void queueUpdate(std::shared_ptr<Mesh> mesh);
     void queueUpload(std::shared_ptr<Mesh> mesh);
     void queueFree  (std::shared_ptr<Mesh> mesh);
 

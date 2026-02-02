@@ -47,6 +47,7 @@ void Camera::update() {
 	);
 
 	projview = proj * view;
+	frustum.update(projview);
 }
 
 const mat4& Camera::getProjview() {

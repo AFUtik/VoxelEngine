@@ -24,6 +24,15 @@ class World {
 	std::map<Vector3I, ChunkPtr> chunkMap;
 	Vector3I lastPlayerChunk = Vector3I(INT_MIN, 0, INT_MIN);
 
+	std::deque<ChunkPtr> chunksToApply;
+	std::thread genThread;
+	std::condition_variable genCVar;
+	std::deque<Vector3I> genDeq;
+	std::mutex genMutex;
+	bool running = true;
+
+	void genWorker();
+
 	int loadDistance = 3;
 
 	void loadNeighbours(ChunkPtr chunk);

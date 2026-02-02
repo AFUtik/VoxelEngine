@@ -34,6 +34,7 @@ template<typename T> using uptr = std::unique_ptr<T>;
 
 int main(int argc, char* argv[])
 {
+
 	BlockModel model;
 	model.id = 0;
 	model.fullCube = true;

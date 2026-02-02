@@ -1,5 +1,5 @@
-#ifndef LIGHTSOLVER_HPP_
-#define LIGHTSOLVER_HPP_
+#ifndef LIGHTSOLVER_HPP
+#define LIGHTSOLVER_HPP
 
 #include <memory>
 #include <cstdint>
@@ -8,38 +8,19 @@
 #include "../blocks/Chunk.hpp"
 #include "../blocks/ChunkInfo.hpp"
 
-template <typename T, size_t UPDATES>
-struct RingBuffer {
-private:
-    T buffer[UPDATES];
-    int head = 0, tail = 0;
-public:
-    inline void write(T entry) {
-        buffer[head] = entry;
-        head = (head + 1) % UPDATES;
-    }
-    inline T& read() {
-        T& entry = buffer[tail];
-        tail = (tail + 1) % UPDATES;
-        return entry;
-    }
-
-    inline bool empty() const {
-        return head == tail;
-    }
+enum class Channels {
+	RED, GREEN, BLUE, LIGHT
 };
 
-class World;
-
 class LightSolver {
-	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> addqueue;
-	RingBuffer<LightEntry, ChunkInfo::VOLUME*2> remqueue;
-	World* chunks;
 	int channel;
+
+	std::queue<LightEntry> addqueue;
+	std::queue<LightEntry> remqueue;
 
 	friend class BasicLightSolver;
 public:
-	LightSolver(World* chunks, int channel);
+	LightSolver(int channel);
 
 	/*
 	 * Adds light right in chunk without chunk finding.
@@ -65,12 +46,6 @@ public:
 };
 
 class BasicLightSolver {
-	void processBoundaryBlockSingle(
-		Chunk* A, Chunk* B,
-		int ax, int ay, int az,
-		int face,
-		std::array<bool,4> &addedAny);
-	
 	void processBoundaryBlock(
 		Chunk* A, Chunk* B,
 		int ax, int ay, int az,
@@ -85,12 +60,15 @@ class BasicLightSolver {
 		switch(chan) {
 			case 0: return  solverR.get();
 			case 1: return  solverG.get();
-			default: return solverB.get();
+			case 2: return  solverB.get();
+			case 3: return  solverS.get();
 		}
 	}
 public:
 	std::unique_ptr<LightSolver> solverR, solverG, solverB, solverS;
-	BasicLightSolver(World* chunks);
+	BasicLightSolver();
+
+	void calculateLight(ChunkPtr &chunk);
 
 	/*
 	 * Propagates light sun top to bottom.
@@ -104,14 +82,10 @@ public:
 	 */
 	void propagateSunRay(int lx, int lz, ChunkPtr &chunk);
 
-	/*
-	 * Calculates light for chunks and neighbours around it.
-	 */
-	void calculateLight(ChunkPtr &chunk);
-
 	void removeLightLocally(int lx, int ly, int lz, ChunkPtr &chunk);
 	
 	void placeLightLocally(int lx, int ly, int lz, Emission emission, ChunkPtr &chunk);
 };
+
 
 #endif /* LIGHTSOLVER_HPP */

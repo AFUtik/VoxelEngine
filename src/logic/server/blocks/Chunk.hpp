@@ -23,11 +23,12 @@ enum class FaceDirection {
 };
 
 const int FACES_ARRAY[] = {
-	13, 12, 21, 4, 15, 10
+	21, 4, 15, 10, 13, 12
 };
 
 class Chunk {
 protected:
+	std::weak_ptr<Chunk> neigbours_safe[26];
 	Chunk* neighbors[26] {nullptr};
 
 	friend class World;
@@ -62,11 +63,6 @@ public:
 		for(int i = 0; i < 26; i++) {
 			if(neighbors[i]) neighbors[i]->neighbors[25-i] = nullptr;
 		}
-	}
-
-	void copyTo(const std::shared_ptr<Chunk> &chunk) {
-		std::copy_n(blocks.get(), ChunkInfo::VOLUME, chunk->blocks.get());
-		std::copy_n(lightmap->map, ChunkInfo::VOLUME, chunk->lightmap->map);
 	}
 
 	inline void loadNeighbour(int ind, Chunk *neigh) {neighbors[ind] = neigh;}    

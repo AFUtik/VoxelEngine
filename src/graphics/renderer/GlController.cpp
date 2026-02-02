@@ -11,7 +11,16 @@ std::shared_ptr<Mesh> GlController::createMesh() {
     return std::make_shared<Mesh>(this);
 }
 
+void GlController::queueUpdate(std::shared_ptr<Mesh> mesh) {
+    if (!mesh->isUploaded()) return;
+
+    std::lock_guard<std::mutex> lock(this->meshUpdateMutex);
+    glUpdate.push_front(mesh);
+}
+
 void GlController::queueUpload(std::shared_ptr<Mesh> mesh) {
+    if (mesh->isUploaded()) return;
+
     std::lock_guard<std::mutex> lock(this->meshUploadMutex);
     glUpload.push_front(mesh);
 }
@@ -28,7 +37,7 @@ void GlController::processAll() {
             auto mesh = glUpload.front();
             glUpload.pop_front();
             
-            if(!mesh || mesh->isUploaded()) continue;
+            if(!mesh) continue;
 
             glGenVertexArrays(1, &mesh->VAO);
             glGenBuffers(1, &mesh->VBO);
@@ -58,6 +67,18 @@ void GlController::processAll() {
             mesh->setUploaded(true);
             mesh->vertices = mesh->buffer.size();
             mesh->clearBuffers();
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lk(meshUpdateMutex);
+        while (!glUpdate.empty()) {
+            auto mesh = glUpdate.front();
+            glUpdate.pop_front();
+
+            glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * VERTEX_SIZE * mesh->buffer.size(), nullptr, GL_STATIC_DRAW);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * VERTEX_SIZE * mesh->buffer.size(), mesh->buffer.data());
         }
     }
     

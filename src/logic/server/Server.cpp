@@ -3,7 +3,7 @@
 
 #include "net/ChunkNet.hpp"
 
-void IntergratedServer::onMessage(ClientMessage msg) {
+void IntergratedServer::onMessage(ClientMessage& msg) {
     ClientMessages messageId = static_cast<ClientMessages>(msg.index());
     switch (messageId) {
         case ClientMessages::Input: {
@@ -34,6 +34,15 @@ void IntergratedServer::onMessage(ClientMessage msg) {
 void IntergratedServer::logicUpdate(double dt) {
     //entitySystem.step(dt);
     //const dvec3 &pos = entitySystem.findById(0)->position;
+    
+    world.loadWithDistance(pos.x, pos.y, pos.z);
+    std::lock_guard<std::mutex> lock(inMutex);
+    {
+        while (!in.empty()) {
+            onMessage(in.front());
+            in.pop_front();
+        }
+    }
 }
 
 void IntergratedServer::logicLoop() {

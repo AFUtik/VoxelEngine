@@ -16,6 +16,10 @@
 #include <shared_mutex>
 #include <iostream>
 #include <chrono>
+#include <optional>
+
+using namespace std;
+using namespace glm;
 
 using Vector3 = glm::dvec3;
 using Vector2 = glm::dvec2;
