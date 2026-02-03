@@ -5,11 +5,12 @@
 #include <memory>
 
 uint8_t Chunk::getBoundLight(int lx, int ly, int lz, int channel) {
-	Chunk *chunk = findNeighbourChunk(lx, ly, lz);
+	std::weak_ptr<Chunk> weak_chunk = findNeighbourChunk(lx, ly, lz);
+	std::shared_ptr<Chunk> chunk = weak_chunk.lock();
 	if (!chunk) return 0;
 
 	int localX, localY, localZ;
-	local(localX, localY, localZ, lx, ly, lz);
+	LOCAL(localX, localY, localZ, lx, ly, lz);
 
 	return chunk->lightmap->get(localX, localY, localZ, channel);
 }

@@ -2,15 +2,20 @@
 #define LIGHTMAP_H_
 
 #include "../blocks/ChunkInfo.hpp"
+#include "LightInfo.hpp"
 
+#include <queue>
 #include <shared_mutex>
-#include <array>
 
 class Lightmap {
+private:
+	std::deque<LightLocal> toAdd, toDel;
+	std::shared_mutex mutex;
+
+	friend class BasicLightSolver;
+	friend class World;
 public:
 	unsigned short* map;
-	bool addedRGBS[4] {false};
-	std::shared_mutex lightMutex;
 
 	Lightmap();
 	~Lightmap();
@@ -58,7 +63,6 @@ public:
 	inline void set(int x, int y, int z, int channel, int value) {
 		const int index = y * ChunkInfo::DEPTH * ChunkInfo::WIDTH + z * ChunkInfo::WIDTH + x;
        		map[index] = (map[index] & (0xFFFF & (~(0xF << (channel * 4))))) | (value << (channel << 2));
-		addedRGBS[channel] = true;
 	}
 };
 

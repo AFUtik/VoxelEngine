@@ -5,6 +5,7 @@
 #include <zip.hpp>
 
 #include "../blocks/Chunk.hpp"
+#include "../../client/blocks/ChunkClient.hpp"
 
 inline void append(std::vector<uint8_t>& v,
     const void* src,
@@ -34,6 +35,7 @@ inline std::vector<uint8_t> serializeChunk(const ChunkPtr& c)
     writeInt(c->pos.x);
     writeInt(c->pos.y);
     writeInt(c->pos.z);
+
     append(out, &c->version, sizeof(uint32_t));
 
     append(out,
@@ -47,7 +49,7 @@ inline std::vector<uint8_t> serializeChunk(const ChunkPtr& c)
     return out; // NRVO
 }
 
-inline ChunkPtr deserializeChunk(const std::vector<uint8_t>& data)
+inline ChunkClientPtr deserializeChunkToClient(const std::vector<uint8_t>& data)
 {
     constexpr size_t expected =
         sizeof(Vector3I) +
@@ -58,7 +60,7 @@ inline ChunkPtr deserializeChunk(const std::vector<uint8_t>& data)
     if (data.size() != expected)
         return nullptr;
 
-    auto c = std::make_shared<Chunk>();
+    Vector3I pos;
 
     size_t off = 0;
 
@@ -67,9 +69,11 @@ inline ChunkPtr deserializeChunk(const std::vector<uint8_t>& data)
         off += 4;
         };
 
-    readInt(c->pos.x);
-    readInt(c->pos.y);
-    readInt(c->pos.z);
+    readInt(pos.x);
+    readInt(pos.y);
+    readInt(pos.z); 
+    
+    auto c = std::make_shared<ChunkClient>(pos);
 
     memcpy(&c->version, data.data() + off, sizeof(uint32_t));
     off += sizeof(uint32_t);

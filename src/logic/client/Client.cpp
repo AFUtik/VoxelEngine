@@ -19,14 +19,11 @@ void Client::onMessage(ServerMessage msg) {
             const auto& chunkState = std::get<ServerChunkStateMsg>(msg);
             std::cout << "received" << std::endl;
 
-            ChunkPtr chunk = deserializeChunk(chunkState.data);
+            ChunkClientPtr chunk = deserializeChunkToClient(chunkState.data);
             loadNeighbours(chunk);
 
-            ChunkClientPtr clientChunk = std::make_shared<ChunkClient>(chunk);
-
-            mesher->queueBuildMesh(clientChunk);
-
-            chunks.emplace(chunk->pos, clientChunk);
+            mesher->queueBuildMesh(chunk);
+            chunks.emplace(chunk->pos, chunk);
             break;
         }
         default: {
@@ -35,7 +32,7 @@ void Client::onMessage(ServerMessage msg) {
     }
 }
 
-void Client::loadNeighbours(ChunkPtr chunk) {
+void Client::loadNeighbours(ChunkClientPtr chunk) {
     for (int i = 0; i < 26; ++i) {
         int nx = chunk->pos.x + OFFSETS[i][0];
         int ny = chunk->pos.y + OFFSETS[i][1];
@@ -43,10 +40,8 @@ void Client::loadNeighbours(ChunkPtr chunk) {
 
         auto it = chunks.find(Vector3I{ nx, ny, nz });
         if (it != chunks.end()) {
-            auto& neigh = it->second->getChunk();
-
-            chunk->loadNeighbour(i, neigh.get());
-            neigh->loadNeighbour(25 - i, chunk.get());
+            auto& neigh = it->second;
+            chunk->loadNeighbour(i, neigh);
         }
     }
 }
@@ -73,6 +68,14 @@ void Client::physicsProcess(double dt) {
 
     if (Events::jpressed(GLFW_KEY_B)) {
         chunks.clear();
+    }
+
+    if (Events::jpressed(GLFW_KEY_V)) {
+        size_t count = 0;
+        for (auto& [pos, chunk] : chunks) {
+            count += chunk->meshInstance.mesh->vertices;
+        }
+        std::cout << count << std::endl;
     }
 
     if (playerChunk != lastPlayerChunk || Events::jpressed(GLFW_KEY_F)) {

@@ -1,6 +1,8 @@
 #ifndef CUBEMESHER_HPP
 #define CUBEMESHER_HPP
 
+#include <threadPool.hpp>
+
 #include <glm/glm.hpp>
 
 #include "../model/Mesh.hpp"
@@ -14,6 +16,15 @@ class Mesher;
 
 using namespace glm;
 using namespace std;
+
+enum class FaceDirection {
+    POS_X,
+    NEG_X,
+    POS_Y,
+    NEG_Y,
+    POS_Z,
+    NEG_Z
+};
 
 struct VoxelFace {
     FaceDirection faceDirection;
@@ -102,7 +113,7 @@ class ChunkMesher {
     unordered_map<size_t, vector<VoxelFace>> zx_faces[6];
 
     BlockModelCubeMaker cubeModel;
-    Chunk* chunk;
+    ChunkClient* chunk;
 
     bool greedyMeshing = false;
 
@@ -211,7 +222,7 @@ class ChunkMesher {
 public:
     void make();
 
-    ChunkMesher(Chunk* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
+    ChunkMesher(ChunkClient* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
         for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
     }
 };
@@ -226,25 +237,11 @@ class Mesher {
     GlController* glController;
     Shader* shader;
 
-    std::thread worker;
-    bool stop = false;
-
-    std::deque<std::shared_ptr<ChunkClient>> buildMeshDeq;
-    std::mutex buildMeshMutex;
-    std::condition_variable buildMeshCVar;
+    ThreadPool* threadPool;
 
     friend class BlockRenderer; 
 public:
-    Mesher(GlController* glController, Shader* shader) : glController(glController), shader(shader) {
-        worker = std::thread([this] { meshWorkerThread(); });
-    }
-
-    ~Mesher() {
-        if (worker.joinable())
-            worker.join();
-    }
-
-    void meshWorkerThread();
+    Mesher(GlController* glController, Shader* shader, ThreadPool* threadPool) : glController(glController), shader(shader), threadPool(threadPool) {}
 
     void queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient);
 };

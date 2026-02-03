@@ -40,7 +40,7 @@ BlockHit raycastBlock(const glm::dvec3& origin,
         std::shared_ptr<Chunk> chunk = world->getChunk(chunkCoord.x, chunkCoord.y, chunkCoord.z);
         if (chunk) {
             int lx, ly, lz;
-            Chunk::local(lx, ly, lz, blockPos.x, blockPos.y, blockPos.z);
+            Chunk::LOCAL(lx, ly, lz, blockPos.x, blockPos.y, blockPos.z);
 
             if (lx >= 0 && lx < ChunkInfo::WIDTH &&
                 ly >= 0 && ly < ChunkInfo::HEIGHT &&

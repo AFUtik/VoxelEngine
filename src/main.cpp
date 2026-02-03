@@ -34,7 +34,6 @@ template<typename T> using uptr = std::unique_ptr<T>;
 
 int main(int argc, char* argv[])
 {
-
 	BlockModel model;
 	model.id = 0;
 	model.fullCube = true;
@@ -71,7 +70,8 @@ int main(int argc, char* argv[])
 	uptr<GlController> glController = std::make_unique<GlController>();
 	uptr<Camera> camera   = std::make_unique<Camera>(glm::dvec3(0, 0, 0), glm::radians(90.0f));
 
-	uptr<Mesher> mesher = std::make_unique<Mesher>(glController.get(), shader.get());
+	uptr<ThreadPool> threadPool = std::make_unique<ThreadPool>(std::thread::hardware_concurrency());
+	uptr<Mesher> mesher = std::make_unique<Mesher>(glController.get(), shader.get(), threadPool.get());
 
 	uptr<IntergratedServer> server = std::make_unique<IntergratedServer>();
 	uptr<Client> client = std::make_unique<Client>(mesher.get(), camera.get());

@@ -28,7 +28,7 @@ struct LightLocal {
 	int32_t ly;
 	int32_t lz;
 	uint8_t light;
-	int32_t channel;
+	uint32_t channel;
 };
 
 #endif

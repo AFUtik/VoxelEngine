@@ -235,35 +235,16 @@ void ChunkMesher::make() {
         }
 }
 
-void Mesher::meshWorkerThread() {
-    while (true) {
-        std::shared_ptr<ChunkClient> clientChunk;
-        {
-            std::unique_lock<std::mutex> lk(buildMeshMutex);
-            buildMeshCVar.wait(lk, [&] {
-                return stop || !buildMeshDeq.empty();
-            });
-            if (stop && buildMeshDeq.empty())
-                break;
-            clientChunk = buildMeshDeq.front(); buildMeshDeq.pop_front();
-        }
-        MeshPtr oldMesh = clientChunk->meshInstance.mesh;
-        MeshPtr newMesh = oldMesh && oldMesh->isUploaded() ? oldMesh : glController->createMesh();
+void Mesher::queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient) {
+    threadPool->enqueue([=] {
+        MeshPtr newMesh = glController->createMesh();
 
-        ChunkMesher chunkMesher(clientChunk->getChunk().get(), newMesh.get());
+        ChunkMesher chunkMesher(chunkClient.get(), newMesh.get());
         chunkMesher.make();
 
-        clientChunk->meshInstance.shader = shader;
-        if (!oldMesh) {
-            clientChunk->meshInstance.mesh = newMesh;
-            glController->queueUpload(newMesh);
-        }
-        else glController->queueUpload(newMesh);
-    }
-}
+        chunkClient->meshInstance.shader = shader;
 
-void Mesher::queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient) {
-    std::unique_lock<std::mutex> lock(buildMeshMutex);
-    buildMeshDeq.push_front(chunkClient);
-    buildMeshCVar.notify_one();
+        chunkClient->meshInstance.mesh = newMesh;
+        glController->queueUpload(newMesh);
+    });
 }

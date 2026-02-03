@@ -77,7 +77,6 @@ void GlController::processAll() {
             glUpdate.pop_front();
 
             glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * VERTEX_SIZE * mesh->buffer.size(), nullptr, GL_STATIC_DRAW);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * VERTEX_SIZE * mesh->buffer.size(), mesh->buffer.data());
         }
     }

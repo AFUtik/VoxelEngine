@@ -35,33 +35,6 @@ void World::genWorker() {
 }
 
 // BLOCK //
-void World::destroyBlock(int x, int y, int z) {
-    auto chunk = getChunkByBlock(x, y, z);
-
-    int lx, ly, lz;
-    Chunk::local(lx, ly, lz, x, y, z);
-
-    if(!chunk) return;
-
-    chunk->setBlock(lx, ly, lz, 0); 
-    lightSolver.removeLightLocally(lx, ly, lz, chunk);
-
-    //updateChunk(chunk);
-}
-
-void World::placeBlock(int x, int y, int z, AbstractBlock &b) {
-    auto chunk = getChunkByBlock(x, y, z);
-    int lx, ly, lz;
-    Chunk::local(lx, ly, lz, x, y, z);
-
-    if(!chunk) return;
-
-    chunk->setBlock(lx, ly, lz, b.getId());
-    lightSolver.placeLightLocally(lx, ly, lz, b.getEmission(), chunk);
-
-    //updateChunk(chunk);
-}
-
 block World::getBlock(int x, int y, int z) {
 	int cx = floorDiv(x, ChunkInfo::WIDTH);
 	int cy = floorDiv(y, ChunkInfo::HEIGHT);
@@ -126,11 +99,11 @@ void World::generateChunk(int x, int y, int z) {
     auto it = chunkMap.find({x, y, z});
     if (it != chunkMap.end()) return;
         
-    ChunkPtr chunk = std::make_shared<Chunk>(Vector3I{x, y, z});
+    ChunkPtr chunk = Chunk::make(Vector3I{x, y, z});
     loadNeighbours(chunk);
     generate(chunk);
 
-    lightSolver.propagateSunLight(chunk.get());
+    lightSolver.propagateSunLight(chunk);
     lightSolver.calculateLight(chunk);
 
     chunkMap.emplace(chunk->pos, chunk);
@@ -159,17 +132,15 @@ std::shared_ptr<Chunk> World::getChunk(int x, int y, int z) {
 }
 
 void World::loadNeighbours(ChunkPtr chunk) {
-    for (int i = 0; i < 26; ++i) {
-        int nx = chunk->pos.x + OFFSETS[i][0];
-        int ny = chunk->pos.y + OFFSETS[i][1];
-        int nz = chunk->pos.z + OFFSETS[i][2];
+    for (int i = 0; i < 6; ++i) {
+        int nx = chunk->pos.x + FACE_DIRS[i][0];
+        int ny = chunk->pos.y + FACE_DIRS[i][1];
+        int nz = chunk->pos.z + FACE_DIRS[i][2];
 
         auto it = chunkMap.find(Vector3I{nx, ny, nz});
         if (it != chunkMap.end()) {
             auto& neigh = it->second;
-
-            chunk->loadNeighbour(i,    neigh.get());
-            neigh->loadNeighbour(25-i, chunk.get());
+            chunk->loadNeighbour(i, neigh);
         }
     }
 }
@@ -199,4 +170,5 @@ void World::loadWithDistance(double x, double y, double z) {
 
         lastPlayerChunk = playerChunk;
 	}
+    
 }
