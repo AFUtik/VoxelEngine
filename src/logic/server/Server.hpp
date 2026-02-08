@@ -7,15 +7,19 @@
 #include "ServerCommunication.hpp"
 
 #include <ptypes.hpp>
+#include <threadPool.hpp>
 
 class Client;
 
 class IntergratedServer : Node {
 private:
+    ThreadPool* threadPool;
     Client* client;
 
     World world;
     EntitySystem entitySystem;
+
+    std::unordered_set<Vector3I> requestedChunks;
 
     std::deque<ClientMessage> in;
     std::mutex inMutex;
@@ -29,13 +33,15 @@ private:
     std::thread logicThread;
     std::atomic<bool> running{true};
 
-    static const int SERVER_LOADDISTANCE = 3;
+    static const int SERVER_LOADDISTANCE = 8;
+
+    friend class Client;
 public:
     Vector3 pos;
 
     void onMessage(ClientMessage& cmd);
 
-    IntergratedServer() : world(SERVER_LOADDISTANCE), entitySystem(&world) {
+    IntergratedServer(ThreadPool* threadPool) : threadPool(threadPool), world(SERVER_LOADDISTANCE), entitySystem(&world) {
         logicThread = std::thread([this] { logicLoop(); });
 
         auto player = std::make_unique<Entity>();

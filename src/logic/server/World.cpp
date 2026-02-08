@@ -16,24 +16,6 @@ World::World(int loadDistance) : noise(0), menger(81, 3), lightSolver()  {
 
 World::~World() {}
 
-void World::genWorker() {
-    while (running) {
-        Vector3I pos;
-        {
-            std::unique_lock<std::mutex> lk(genMutex);
-            genCVar.wait(lk, [&] {
-                return !running || !genDeq.empty();
-                });
-            if (!running && genDeq.empty())
-                break;
-            pos = genDeq.front(); genDeq.pop_front();
-        }
-
-        ChunkPtr chunk = std::make_shared<Chunk>(pos);
-        generate(chunk);
-    }
-}
-
 // BLOCK //
 block World::getBlock(int x, int y, int z) {
 	int cx = floorDiv(x, ChunkInfo::WIDTH);
@@ -96,24 +78,37 @@ void World::generate(ChunkPtr chunk)
 }
 
 void World::generateChunk(int x, int y, int z) {
-    auto it = chunkMap.find({x, y, z});
+    auto it = chunkMap.find(Vector3I{x, y, z});
     if (it != chunkMap.end()) return;
-        
-    ChunkPtr chunk = Chunk::make(Vector3I{x, y, z});
+    
+    ChunkPtr chunk = std::make_shared<Chunk>(Vector3I{x, y, z});
+    {
+        std::unique_lock<std::shared_mutex> lock(chunkThreadMapMutex);
+        chunkThreadMap.emplace(chunk->pos, chunk);
+    }
+
     loadNeighbours(chunk);
     generate(chunk);
 
     lightSolver.propagateSunLight(chunk);
     lightSolver.calculateLight(chunk);
 
-    chunkMap.emplace(chunk->pos, chunk);
+    {
+        std::unique_lock<std::shared_mutex> lock(chunkMapMutex);
+        chunkMap.emplace(chunk->pos, chunk);
+    }
+    {
+        std::unique_lock<std::shared_mutex> lock(chunkThreadMapMutex);
+        chunkThreadMap.erase(chunk->pos);
+    }
 }
 
 void World::unloadChunk(int cx, int cy, int cz) {
     auto it = chunkMap.find({cx, cy, cz});
     if (it == chunkMap.end()) return;
     
-    chunkMap.erase(Vector3I{cx, cy, cz});
+    it->second->unlinkAll();
+    chunkMap.erase({cx, cy, cz});
 }
 
 std::shared_ptr<Chunk> World::getChunkByBlock(int x, int y, int z) {
@@ -131,16 +126,33 @@ std::shared_ptr<Chunk> World::getChunk(int x, int y, int z) {
 	return it->second;
 }
 
+ChunkPtr World::getChunkOutThreadSafe(Vector3I pos) {
+    std::shared_lock<std::shared_mutex> read(chunkThreadMapMutex);
+    auto it = chunkThreadMap.find(pos);
+    if (it != chunkThreadMap.end()) return it->second;
+    return {};
+}
+
+ChunkPtr World::getChunkSafe(Vector3I pos) {
+    std::shared_lock<std::shared_mutex> read(chunkMapMutex);
+    auto it = chunkMap.find(pos);
+    if (it != chunkMap.end()) return it->second;
+    return {};
+}
+
 void World::loadNeighbours(ChunkPtr chunk) {
     for (int i = 0; i < 6; ++i) {
         int nx = chunk->pos.x + FACE_DIRS[i][0];
         int ny = chunk->pos.y + FACE_DIRS[i][1];
         int nz = chunk->pos.z + FACE_DIRS[i][2];
 
-        auto it = chunkMap.find(Vector3I{nx, ny, nz});
-        if (it != chunkMap.end()) {
-            auto& neigh = it->second;
+        if (ChunkPtr neigh = getChunkSafe({nx, ny, nz})) {
             chunk->loadNeighbour(i, neigh);
+        }
+        else {
+            if (ChunkPtr neighOutThread = getChunkOutThreadSafe({ nx, ny, nz })) {
+                chunk->loadNeighbour(i, neighOutThread);
+            }
         }
     }
 }
@@ -162,13 +174,12 @@ void World::loadWithDistance(double x, double y, double z) {
         }
         for (auto& chunk : toUnload) unloadChunk(chunk->pos.x, chunk->pos.y, chunk->pos.z);
 
-        for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
-            for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
-                generateChunk(x, 0, z);
-            }
-        }
+        //for (int x = playerChunk.x - loadDistance; x <= playerChunk.x + loadDistance; x++) {
+        //    for (int z = playerChunk.z - loadDistance; z <= playerChunk.z + loadDistance; z++) {
+        //        generateChunk(x, 0, z);
+        //    }
+        //}
 
         lastPlayerChunk = playerChunk;
 	}
-    
 }

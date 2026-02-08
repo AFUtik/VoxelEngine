@@ -158,8 +158,8 @@ void ChunkMesher::make() {
             float y2 = f.maxY + 1;
             float z2 = f.maxZ + 1;
 
-            float u1 = 0.0f + (f.maxZ - f.minZ);
-            float v1 = 0.0f + (f.maxY - f.minY);
+            float u1 = 32.0f/512.0f + (f.maxZ - f.minZ);
+            float v1 = 32.0f/512.0f + (f.maxY - f.minY);
             float u2 = u1 + uvsize;
             float v2 = v1 + uvsize;
             cubeModel.addFaceXPlane(x2, y1, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -173,8 +173,8 @@ void ChunkMesher::make() {
             float y2 = f.maxY + 1;
             float z2 = f.maxZ + 1;
 
-            float u1 = 0.0f + (f.maxZ - f.minZ);
-            float v1 = 0.0f +      (f.maxY - f.minY);
+            float u1 = 32.0f/512.0f + (f.maxZ - f.minZ);
+            float v1 = 32.0f/512.0f +      (f.maxY - f.minY);
             float u2 = u1 + uvsize;
             float v2 = v1 + uvsize;
             cubeModel.addFaceNXPlane(x1, y1, z1, x1, y2, z2, u1, v1, u2, v2, f.light);
@@ -186,8 +186,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ + 1;
         float x2 = f.maxX + 1;
 
-        float u1 = 0.0f + (f.maxX - f.minX);
-        float v1 = 0.0f + (f.maxZ - f.minZ);
+        float u1 = 32.0f/512.0f + (f.maxX - f.minX);
+        float v1 = 32.0f/512.0f + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceYPlane(x1, y2, z1, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -199,8 +199,8 @@ void ChunkMesher::make() {
         float z2 = f.maxZ + 1;
         float x2 = f.maxX + 1;
 
-        float u1 = 0.0f + (f.maxX - f.minX);
-        float v1 = 0.0f + (f.maxZ - f.minZ);
+        float u1 = 32.0f/512.0f + (f.maxX - f.minX);
+        float v1 = 32.0f/512.0f + (f.maxZ - f.minZ);
         float u2 = u1 + uvsize;
         float v2 = v1 + uvsize;
         cubeModel.addFaceNYPlane(x1, y1, z1, x2, y1, z2, u1, v1, u2, v2, f.light);
@@ -213,8 +213,8 @@ void ChunkMesher::make() {
             float x2 = f.maxX + 1;
             float y2 = f.maxY + 1;
 
-            float u1 = 0.0f + (f.maxX - f.minX);
-            float v1 = 0.0f + (f.maxY - f.minY);
+            float u1 = 32.0f/512.0f + (f.maxX - f.minX);
+            float v1 = 32.0f/512.0f + (f.maxY - f.minY);
             float u2 = u1 + uvsize;
             float v2 = v1 + uvsize;
             cubeModel.addFaceZPlane(x1, y1, z2, x2, y2, z2, u1, v1, u2, v2, f.light);
@@ -227,8 +227,8 @@ void ChunkMesher::make() {
             float x2 = f.maxX + 1;
             float y2 = f.maxY + 1;
 
-            float u1 = 0.0f + (f.maxX - f.minX);
-            float v1 = 0.0f + (f.maxY - f.minY);
+            float u1 = 32.0f/512.0f + (f.maxX - f.minX);
+            float v1 = 32.0f/512.0f + (f.maxY - f.minY);
             float u2 = u1 + uvsize;
             float v2 = v1 + uvsize;
             cubeModel.addFaceNZPlane(x1, y1, z1, x2, y2, z1, u1, v1, u2, v2, f.light);
@@ -238,13 +238,15 @@ void ChunkMesher::make() {
 void Mesher::queueBuildMesh(std::shared_ptr<ChunkClient> chunkClient) {
     threadPool->enqueue([=] {
         MeshPtr newMesh = glController->createMesh();
+        
+        ChunkProto proto(chunkClient);
 
-        ChunkMesher chunkMesher(chunkClient.get(), newMesh.get());
+        ChunkMesher chunkMesher(proto, newMesh.get());
         chunkMesher.make();
 
         chunkClient->meshInstance.shader = shader;
-
         chunkClient->meshInstance.mesh = newMesh;
+
         glController->queueUpload(newMesh);
     });
 }

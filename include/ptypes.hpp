@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
+#include <array>
 #include <vector>
 #include <unordered_set>
 #include <set>
@@ -25,31 +26,31 @@ using Vector3 = glm::dvec3;
 using Vector2 = glm::dvec2;
 
 template<typename T>
-struct HashVector : public glm::vec<3, T, glm::packed_highp> {
-    using Base = glm::vec<3, T, glm::packed_highp>;
+struct HashVector : public glm::vec<3, T, glm::defaultp> {
+    using Base = glm::vec<3, T, glm::defaultp>;
 
     HashVector() : Base(0) {}
 
     HashVector(T x, T y, T z) : Base(x, y, z) {}
 
     constexpr bool operator==(const HashVector<T>& o) const noexcept {
-        return x == o.x && y == o.y && z == o.z;
+        return Base::x == o.x && Base::y == o.y && Base::z == o.z;
     }
 
     constexpr bool operator!=(const HashVector<T>& o) const noexcept {
-        return x != o.x || y != o.y || z != o.z;
+        return Base::x != o.x || Base::y != o.y || Base::z != o.z;
     }
 
     constexpr bool operator<(const HashVector<T>& o) const noexcept {
-        if (x != o.x) return x < o.x;
-        if (y != o.y) return y < o.y;
-        return z < o.z;
+        if (Base::x != o.x) return Base::x < o.x;
+        if (Base::y != o.y) return Base::y < o.y;
+        return Base::z < o.z;
     }
 
     constexpr bool operator>(const HashVector<T>& o) const noexcept {
-        if (x != o.x) return x > o.x;
-        if (y != o.y) return y > o.y;
-        return z > o.z;
+        if (Base::x != o.x) return Base::x > o.x;
+        if (Base::y != o.y) return Base::y > o.y;
+        return Base::z > o.z;
     }
 };
 

@@ -5,7 +5,7 @@ endif()
 
 cmake_minimum_required (VERSION 3.8)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(PROJECT_NAME VoxelEngine)
 
@@ -26,4 +26,11 @@ find_package(PNG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(zstd CONFIG REQUIRED)
 
-target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW ZLIB::ZLIB PNG::PNG glm::glm zstd::libzstd)
+target_link_libraries(${PROJECT_NAME} 
+	glfw 
+	OpenGL::GL 
+	GLEW::GLEW 
+	ZLIB::ZLIB 
+	PNG::PNG 
+	glm::glm 
+	zstd::libzstd)

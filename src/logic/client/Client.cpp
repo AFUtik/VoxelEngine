@@ -17,13 +17,12 @@ void Client::onMessage(ServerMessage msg) {
         }
         case ServerMessages::ChunkState: {
             const auto& chunkState = std::get<ServerChunkStateMsg>(msg);
-            std::cout << "received" << std::endl;
 
             ChunkClientPtr chunk = deserializeChunkToClient(chunkState.data);
-            loadNeighbours(chunk);
-
-            mesher->queueBuildMesh(chunk);
             chunks.emplace(chunk->pos, chunk);
+
+            loadNeighbours(chunk);
+            requested.erase(chunk->pos);
             break;
         }
         default: {
@@ -40,13 +39,24 @@ void Client::loadNeighbours(ChunkClientPtr chunk) {
 
         auto it = chunks.find(Vector3I{ nx, ny, nz });
         if (it != chunks.end()) {
-            auto& neigh = it->second;
+            auto neigh = it->second;
+
             chunk->loadNeighbour(i, neigh);
+            if (neigh->checkNeighbours() && !neigh->meshInstance.mesh) mesher->queueBuildMesh(neigh);
         }
+        if (chunk->checkNeighbours()) mesher->queueBuildMesh(chunk);
     }
 }
 
 void Client::physicsProcess(double dt) {
+    {
+        std::lock_guard<std::mutex> lock(server->outMutex);
+        while (!server->out.empty()) {
+            auto message = server->out.front(); server->out.pop_front();
+            onMessage(message);
+        }
+    }
+    
     server->pos = camera->getPosition();
 
     inputAccumulator += dt;
@@ -67,7 +77,10 @@ void Client::physicsProcess(double dt) {
     Vector3I playerChunk = { floorDiv(server->pos.x, ChunkInfo::WIDTH), floorDiv(server->pos.y, ChunkInfo::HEIGHT), floorDiv(server->pos.z, ChunkInfo::DEPTH) };
 
     if (Events::jpressed(GLFW_KEY_B)) {
-        chunks.clear();
+        for (auto& [pos, chunk] : chunks) 
+        {
+            mesher->queueBuildMesh(chunk);
+        }
     }
 
     if (Events::jpressed(GLFW_KEY_V)) {
@@ -88,13 +101,24 @@ void Client::physicsProcess(double dt) {
                 toUnload.push_back(pos);
             }
         }
-        for (auto pos : toUnload) chunks.erase(pos);
+
+        for (auto pos : toUnload) {
+            auto it = chunks.find(pos);
+            if (it != chunks.end()) {
+                auto chunk = it->second;
+                //chunk->unlinkAll();
+                chunks.erase(it);
+            }
+        }
 
         for (int x = playerChunk.x - CLIENT_LOADDISTANCE; x <= playerChunk.x + CLIENT_LOADDISTANCE; x++) {
             for (int z = playerChunk.z - CLIENT_LOADDISTANCE; z <= playerChunk.z + CLIENT_LOADDISTANCE; z++) {
-                if(chunks.find({x, 0, z}) == chunks.end()) server->sendMessage(
-                    ClientChunkSync{ x, 0, z, 0 }
-                );
+                if (chunks.find({ x, 0, z }) == chunks.end() && requested.find({ x, 0, z }) == requested.end()) {
+                    requested.insert({ x, 0, z });
+                    server->sendMessage(
+                        ClientChunkSync{ x, 0, z, 0 }
+                    );
+                }
             }
         }
         lastPlayerChunk = playerChunk;

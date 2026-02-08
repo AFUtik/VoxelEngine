@@ -17,6 +17,8 @@ inline void append(std::vector<uint8_t>& v,
 
 inline std::vector<uint8_t> serializeChunk(const ChunkPtr& c)
 {
+    if (!c) return {};
+
     constexpr size_t totalSize =
         sizeof(Vector3I) +
         sizeof(uint32_t) +

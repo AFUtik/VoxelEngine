@@ -23,6 +23,11 @@ public:
 
     MeshInstance() {};
 
+    ~MeshInstance() 
+    {
+
+    };
+
     inline void setPosition(const Vector3& vector) {
         transform.setPosition(vector);
         if (has_aabb) aabb.translate(vector);
@@ -41,8 +46,10 @@ public:
 };
 
 class MeshGroup {
+public:
     std::vector<MeshInstance> instances;
     AABB aabb;
+    Shader* shader;
 
     bool has_aabb = false;
 
@@ -50,7 +57,14 @@ class MeshGroup {
         if (!has_aabb || !camera->getFrustum().boxInFrustum(aabb)) return;
 
         for (auto &&meshInstance : instances) {
-            if (!camera->getFrustum().boxInFrustum(meshInstance.aabb)) return;
+            if (meshInstance.has_aabb && !camera->getFrustum().boxInFrustum(aabb)) return;
+
+            if (!shader) return;
+
+            glUniformMatrix4fv(shader->model_loc, 1, GL_FALSE, glm::value_ptr(meshInstance.transform.model(camera)));
+            if (meshInstance.mesh && meshInstance.mesh->isUploaded()) {
+                meshInstance.mesh->draw();
+            }
         }
     }
 };

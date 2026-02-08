@@ -2,7 +2,7 @@
 #define THREADPOOL_HPP
 
 #include <vector>
-#include <queue>
+#include <deque>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -38,7 +38,7 @@ public:
             if (stop)
                 return;
 
-            tasks.push(std::move(task));
+            tasks.push_front(std::move(task));
         }
 
         cv.notify_one();
@@ -60,7 +60,7 @@ private:
                     return;
 
                 task = std::move(tasks.front());
-                tasks.pop();
+                tasks.pop_front();
             }
 
             task();
@@ -83,7 +83,7 @@ private:
 
 private:
     std::vector<std::thread> workers;
-    std::queue<std::function<void()>> tasks;
+    std::deque<std::function<void()>> tasks;
 
     std::mutex mutex;
     std::condition_variable cv;

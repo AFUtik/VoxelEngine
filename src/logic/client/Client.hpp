@@ -27,6 +27,7 @@ private:
     Mesher* mesher;
 
     std::unordered_map<Vector3I, std::shared_ptr<ChunkClient>> chunks;
+    std::unordered_set<Vector3I> requested;
     Vector3I lastPlayerChunk = Vector3I(INT_MIN, 0, INT_MIN);
 
     void loadNeighbours(ChunkClientPtr chunk);
@@ -36,7 +37,7 @@ private:
 
     Vector3 playerPos = Vector3(0);
 
-    const static int CLIENT_LOADDISTANCE = 3;
+    const static int CLIENT_LOADDISTANCE = 8;
 
     double inputAccumulator = 0;
     size_t tick = 0;

@@ -12,17 +12,23 @@ void IntergratedServer::onMessage(ClientMessage& msg) {
         }
         case ClientMessages::ChunkSync: {
             ClientChunkSync chunkSync = std::get<ClientChunkSync>(msg);
-            ChunkPtr chunk = world.getChunk(chunkSync.x, chunkSync.y, chunkSync.z);
+            threadPool->enqueue([=] {
+                ChunkPtr chunk = world.getChunk(chunkSync.x, chunkSync.y, chunkSync.z);
+                ServerChunkStateMsg chunkState;
+                if (!chunk) {
+                    world.generateChunk(chunkSync.x, chunkSync.y, chunkSync.z);
 
-            ServerChunkStateMsg chunkState;
-            if (!chunk) {
-                world.generateChunk(chunkSync.x, chunkSync.y, chunkSync.z);
-                chunkState.data = serializeChunk(world.getChunk(chunkSync.x, chunkSync.y, chunkSync.z));
-            }
-            else {
-                chunkState.data = serializeChunk(chunk);
-            }
-            client->onMessage(chunkState);
+                    chunkState.data = serializeChunk(world.getChunk(chunkSync.x, chunkSync.y, chunkSync.z));
+                }
+                else {
+                    chunkState.data = serializeChunk(chunk);
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(outMutex);
+                    out.push_front(chunkState);
+                }
+            });
             break;
         }
         default: {
@@ -35,9 +41,9 @@ void IntergratedServer::logicUpdate(double dt) {
     //entitySystem.step(dt);
     //const dvec3 &pos = entitySystem.findById(0)->position;
     
-    world.loadWithDistance(pos.x, pos.y, pos.z);
-    std::lock_guard<std::mutex> lock(inMutex);
+    //world.loadWithDistance(pos.x, pos.y, pos.z);
     {
+        std::lock_guard<std::mutex> lock(inMutex);
         while (!in.empty()) {
             onMessage(in.front());
             in.pop_front();

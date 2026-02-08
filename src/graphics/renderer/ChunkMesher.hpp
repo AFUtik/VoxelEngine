@@ -113,7 +113,7 @@ class ChunkMesher {
     unordered_map<size_t, vector<VoxelFace>> zx_faces[6];
 
     BlockModelCubeMaker cubeModel;
-    ChunkClient* chunk;
+    ChunkProto *chunk;
 
     bool greedyMeshing = false;
 
@@ -222,7 +222,7 @@ class ChunkMesher {
 public:
     void make();
 
-    ChunkMesher(ChunkClient* chunk, Mesh* mesh) : chunk(chunk), cubeModel(mesh) {
+    ChunkMesher(ChunkProto &chunk, Mesh* mesh) : chunk(&chunk), cubeModel(mesh) {
         for(int i = 0; i < 2; i++) y_faces[i].reserve(512);
     }
 };

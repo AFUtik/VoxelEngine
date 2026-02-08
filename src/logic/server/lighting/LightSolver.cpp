@@ -35,6 +35,8 @@ void BasicLightSolver::solve(ChunkPtr schunk) {
 
 	if (addqueue.empty() && remqueue.empty()) return;
 
+	uint32_t changes = addqueue.size() + remqueue.size();
+
 	//while (!remqueue.empty()) {
 	//	LightEntry entry = remqueue.front(); remqueue.pop();
 	//
@@ -68,9 +70,8 @@ void BasicLightSolver::solve(ChunkPtr schunk) {
 	//		}
 	//	}
 	//}
-
-	//std::shared_lock<std::shared_mutex> read(chunk->lightmap->mutex);
-	//{
+	{
+		std::unique_lock<std::shared_mutex> lock(chunk->lightmap->mutex);
 		while (!addqueue.empty()) {
 			LightLocal entry = addqueue.front(); addqueue.pop_front();
 			if (entry.light <= 1) continue;
@@ -94,16 +95,14 @@ void BasicLightSolver::solve(ChunkPtr schunk) {
 				}
 			}
 		}
-	//}
+	}
 }
 
 void BasicLightSolver::solveRecursive(ChunkPtr chunk) {
 	if(chunk->lightmap->toAdd.empty() && chunk->lightmap->toDel.empty()) return;
 
 	solve(chunk);
-	for (int i = 0; i < 6; i++) {
-		if (auto n = chunk->getNeighbour(i).lock()) calculateLight(n);
-	}
+	for (int i = 0; i < 6; i++) if (auto n = chunk->getNeighbour(i)) calculateLight(n);
 }
 
 void BasicLightSolver::processBoundaryBlock(
@@ -174,22 +173,25 @@ void BasicLightSolver::propagateSunLight(ChunkPtr chunk) {
 			}
 		}
 	}*/
-	for (int z = 0; z < ChunkInfo::DEPTH; z++) {
-		for (int x = 0; x < ChunkInfo::WIDTH; x++) {
-			for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
-				block vox = chunk->getBlock(x, y, z);
-				if (vox.id != 0) {
-					break;
+	{
+		std::unique_lock<std::shared_mutex> lock(chunk->lightmap->mutex);
+		for (int z = 0; z < ChunkInfo::DEPTH; z++) {
+			for (int x = 0; x < ChunkInfo::WIDTH; x++) {
+				for (int y = ChunkInfo::HEIGHT - 1; y >= 0; y--) {
+					block vox = chunk->getBlock(x, y, z);
+					if (vox.id != 0) {
+						break;
+					}
+					if (
+						chunk->getBoundLight(x - 1, y, z, 3) == 0 ||
+						chunk->getBoundLight(x + 1, y, z, 3) == 0 ||
+						chunk->getBoundLight(x, y - 1, z, 3) == 0 ||
+						chunk->getBoundLight(x, y + 1, z, 3) == 0 ||
+						chunk->getBoundLight(x, y, z - 1, 3) == 0 ||
+						chunk->getBoundLight(x, y, z + 1, 3) == 0
+						) addLocally(x, y, z, 0xF, 3, raw);
+					chunk->setLight(x, y, z, 3, 0xF);
 				}
-				if (
-					chunk->getBoundLight(x - 1, y, z, 3) == 0 ||
-					chunk->getBoundLight(x + 1, y, z, 3) == 0 ||
-					chunk->getBoundLight(x, y - 1, z, 3) == 0 ||
-					chunk->getBoundLight(x, y + 1, z, 3) == 0 ||
-					chunk->getBoundLight(x, y, z - 1, 3) == 0 ||
-					chunk->getBoundLight(x, y, z + 1, 3) == 0
-					) addLocally(x, y, z, 0xF, 3, raw);
-				chunk->setLight(x, y, z, 3, 0xF);
 			}
 		}
 	}
@@ -213,10 +215,15 @@ void BasicLightSolver::propagateSunRay(int lx, int lz, ChunkPtr &chunk) {
 }
 
 void BasicLightSolver::calculateLight(ChunkPtr chunk) {
+	if (chunk->lightmap->toAdd.empty() && chunk->lightmap->toDel.empty()) return;
 	for (int face = 0; face < 6; ++face) {
-		if (auto n = chunk->getNeighbour(face).lock()) {
-			syncBoundaryWithNeigbour(chunk.get(), n.get(), face);
+		if (auto n = chunk->getNeighbour(face)) {
+			{
+				std::scoped_lock lock(chunk->lightmap->mutex, n->lightmap->mutex);
+				syncBoundaryWithNeigbour(chunk.get(), n.get(), face);
+			}
 		}
 	}
-	solveRecursive(chunk);
+	solve(chunk);
+	for (int i = 0; i < 6; i++) if (auto n = chunk->getNeighbour(i)) calculateLight(n);
 }

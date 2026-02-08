@@ -89,17 +89,23 @@ int _png_load(const char* file, int* width, int* height) {
         png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
         return 0;
     }
+
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
+
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t_width, t_height, 0,
-        alpha, GL_UNSIGNED_BYTE, (GLvoid*)image_data);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+        t_width, t_height, 0,
+        alpha, GL_UNSIGNED_BYTE, image_data);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 

@@ -9,7 +9,7 @@
 
 class GlController;
 
-class Mesh {
+class Mesh : std::enable_shared_from_this<Mesh> {
 	GlController* glController;
 	
 	friend class GlController;
@@ -20,9 +20,8 @@ public:
 	std::vector<uint32_t> indices;
 	
 	std::atomic<bool> uploaded;
-	
-	int vertices = 0; 
 
+	int vertices = 0; 
 	void clearBuffers() {
 		buffer  = std::vector<Vertex>();
 		//indices = std::vector<uint32_t>();

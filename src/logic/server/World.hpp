@@ -16,31 +16,30 @@ class Chunk;
 struct block;
 
 class World {
+	unordered_map<Vector3I, ChunkPtr> chunkThreadMap;
+	std::shared_mutex chunkThreadMapMutex;
+
+	unordered_map<Vector3I, ChunkPtr> chunkMap;
+	std::shared_mutex chunkMapMutex;
+
 	BasicLightSolver lightSolver;
 
 	MengerSpongeGenerator menger;
 	PerlinNoise noise;
-	
-	std::map<Vector3I, ChunkPtr> chunkMap;
+
 	Vector3I lastPlayerChunk = Vector3I(INT_MIN, 0, INT_MIN);
 
-	std::deque<ChunkPtr> chunksToApply;
-	std::thread genThread;
-	std::condition_variable genCVar;
-	std::deque<Vector3I> genDeq;
-	std::mutex genMutex;
-	bool running = true;
-
-	void genWorker();
-
-	int loadDistance = 3;
+	int loadDistance = 8;
 
 	void loadNeighbours(ChunkPtr chunk);
 	void generate(ChunkPtr chunk);
 	
-	friend class BlockRenderer;
-	friend class Mesher;
+	friend class IntergratedServer;
+
+	ChunkPtr getChunkOutThreadSafe(Vector3I pos);
 public:
+	ChunkPtr getChunkSafe(Vector3I pos);
+
 	const auto& getChunkMap() {return chunkMap;}
 
 	void generateChunk(int cx, int cy, int cz);
